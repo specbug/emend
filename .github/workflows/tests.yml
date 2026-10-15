@@ -1,0 +1,27 @@
+name: Tests
+on: [push, pull_request]
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.23"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install and verify tools
+        env:
+          UV_CACHE_DIR: ${{ runner.temp }}/uv-cache
+          EMEND_TOOLS_DIR: ${{ runner.temp }}/emend-tools
+        run: bash scripts/setup-cloud.sh
+      - run: uv run ruff check . && uv run ruff format --check .
+      - name: Run regression tests and official EPUBCheck integration
+        env:
+          EMEND_TEST_EPUBCHECK_JAR: ${{ runner.temp }}/emend-tools/epubcheck-5.3.0/epubcheck.jar
+        run: uv run pytest -q
