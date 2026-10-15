@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,12 +41,24 @@ class Publishing(StrictModel):
     backup_remote: str | None = None
 
 
+class MetadataPolicy(StrictModel):
+    sources: list[Literal["openlibrary", "google_books"]] = Field(
+        default_factory=lambda: ["openlibrary", "google_books"], min_length=1
+    )
+    cache_days: int = Field(default=7, ge=1, le=365)
+    request_timeout_seconds: int = Field(default=15, ge=1, le=120)
+
+    def fingerprint(self) -> str:
+        return hashlib.sha256(json.dumps(self.model_dump(), sort_keys=True).encode()).hexdigest()
+
+
 class Config(StrictModel):
     root: Path = Field(default_factory=lambda: Path.home() / "Emend")
     quality: Quality = Field(default_factory=Quality)
     limits: Limits = Field(default_factory=Limits)
     tools: ToolPaths = Field(default_factory=ToolPaths)
     publish: Publishing = Field(default_factory=Publishing)
+    metadata: MetadataPolicy = Field(default_factory=MetadataPolicy)
 
     def policy_hash(self) -> str:
         policy = {"quality": self.quality.model_dump(), "limits": self.limits.model_dump()}

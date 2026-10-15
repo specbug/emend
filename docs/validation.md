@@ -4,6 +4,7 @@ Validated in the Linux cloud development environment with Python 3.12, Java 21, 
 
 ## Executed checks
 
+- The metadata curation branch passes 108 tests locally, including real EPUBCheck validation of edited EPUB 2 and EPUB 3 artifacts. Research fixtures cover ISBN checksums, exact-edition filtering, conservative reconciliation, source provenance, cache age/integrity, bounded responses, and redirect restrictions. Apply tests cover stale/tampered plans, explicit review, resource/package preservation, validator rejection, database rollback, original reset, and revision-aware publication.
 - Regression tests cover EPUB 2/3 structure, footnotes and images, broken URLs/fragments, missing resources, duplicate IDs, ZIP traversal, XML entities, malformed input, typography observations, and content fingerprints.
 - Pipeline tests cover exact byte preservation, repeat ingestion, missing/failed/timed-out validators, revocation after failed revalidation, source/artifact tampering, policy changes, escaped HTML reports, and CLI exit codes.
 - Calibre/rclone integration-boundary tests use fake local executables to exercise command arguments, idempotency, interrupted delivery reconciliation, per-destination retries, changed destinations, and verification of Calibre's stored EPUB.
@@ -24,15 +25,16 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-For another machine, use its actual EPUBCheck JAR path. Without `EMEND_TEST_EPUBCHECK_JAR`, the two official-validator integration cases are explicitly skipped. The remaining validator subprocess tests use fixtures and are not substitutes for the official integration.
+For another machine, use its actual EPUBCheck JAR path. Without `EMEND_TEST_EPUBCHECK_JAR`, the official-validator integration cases are explicitly skipped. The remaining validator subprocess tests use fixtures and are not substitutes for the official integration.
 
 ## Remaining integration checks
 
 - The target Mac mini M4 was not accessible. Calibre's macOS executable detection and command arguments are implemented; the argument/JSON formats were cross-checked against upstream Calibre source. A real Calibre import and opening a restored library still need verification on the Mac.
 - No personal Google Drive account was connected or uploaded to. rclone upload behavior is tested at the process boundary; the user must configure and verify the actual remote locally.
 - Ace is optional and was tested with structured subprocess fixtures, not a real browser accessibility audit. Reports show it as unavailable when it is absent.
-- GitHub Actions is configured for macOS and Linux, but those hosted jobs have not run in this session.
-- AI metadata/cover research, visual EPUB rendering, automatic repair, and XTEINK transfer are deferred milestones. No device compatibility or publication-quality certification is claimed.
+- The foundation PR passed hosted macOS and Linux CI. The metadata branch has been validated locally; its hosted CI is tracked on its PR.
+- Public Open Library and Google Books requests were blocked by the cloud network proxy (HTTP tunnel 403). Required domains were saved in the environment draft; provider adapters are tested with synthetic responses, not live records. Apply the environment network settings before live verification.
+- Meta Model API recommendations await access to its documentation and API credentials; `dev.meta.ai` was added to the saved network draft. Cover replacement, visual EPUB rendering, general structural repair, and XTEINK transfer remain deferred. No device compatibility or publication-quality certification is claimed.
 
 ## Report presentation
 

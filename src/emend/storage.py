@@ -31,6 +31,10 @@ class Store:
                     updated_at TEXT NOT NULL, receipt TEXT NOT NULL,
                     PRIMARY KEY(book_id, target_key)
                 );
+                CREATE TABLE IF NOT EXISTS research_plans (
+                    id TEXT PRIMARY KEY, book_id TEXT NOT NULL, created_at TEXT NOT NULL,
+                    path TEXT NOT NULL, sha256 TEXT NOT NULL
+                );
             """)
 
     @contextmanager
@@ -111,3 +115,32 @@ class Store:
                 "INSERT OR REPLACE INTO publications VALUES (?, ?, ?, ?, ?)",
                 (book_id, key, status, now(), json.dumps(receipt)),
             )
+
+    def event(self, book_id: str, state: str, detail: str):
+        with self.db() as db:
+            db.execute(
+                "INSERT INTO events(book_id, state, at, detail) VALUES (?, ?, ?, ?)",
+                (book_id, state, now(), detail),
+            )
+
+    def save_plan(self, identifier: str, book_id: str, path: Path, digest: str):
+        with self.db() as db:
+            db.execute(
+                "INSERT INTO research_plans VALUES (?, ?, ?, ?, ?)",
+                (identifier, book_id, now(), str(path), digest),
+            )
+
+    def plan(self, book_id: str, identifier: str | None = None) -> dict:
+        with self.db() as db:
+            if identifier:
+                row = db.execute(
+                    "SELECT * FROM research_plans WHERE book_id=? AND id=?", (book_id, identifier)
+                ).fetchone()
+            else:
+                row = db.execute(
+                    "SELECT * FROM research_plans WHERE book_id=? ORDER BY created_at DESC LIMIT 1",
+                    (book_id,),
+                ).fetchone()
+        if row is None:
+            raise ValueError("No matching research plan. Run emend research first.")
+        return dict(row)

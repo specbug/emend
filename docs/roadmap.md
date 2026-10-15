@@ -11,9 +11,13 @@ The first usable version follows the supplied Emend design's reliable-foundation
 - Gated Calibre and optional rclone EPUB publishing.
 - Complete Calibre library snapshots, per-file verification, Google Drive upload, and restoration into a new directory.
 
-## Next: metadata and controlled repair
+## Delivered: evidence-backed metadata curation
 
-Retrieve edition records by exact ISBN, reconcile multiple sources, cache responses, and retain evidence for every proposal. Add typed transformation operations with preconditions, before/after resource and text invariants, and rollback. Keep prose rewriting out of automatic operations. Add cover candidate provenance and edition matching before replacement.
+Exact-ISBN Open Library/Google Books research, cached responses, retained evidence, conservative proposals, explicit title/publisher/date/language edits, independent package/resource preservation checks, validation before activation, revision snapshots, and rollback on failed application. Cover candidates retain edition provenance but are not downloaded or replaced. Public provider access still needs live verification in the restricted cloud environment; local fixture coverage does not establish live API compatibility.
+
+## Next: AI-assisted review and cover research
+
+The requested integration is [Meta Model API](https://dev.meta.ai/products/meta-model-api). Its documentation is currently blocked by cloud network policy; verify the current API contract and credential destination once access is available. No substitute provider or credential is assumed. Recommendations should cite collected evidence and remain subject to explicit review, typed edits, and deterministic preservation gates. Add broader edition matching for books without ISBNs, cover quality/edition checks, and reviewed cover replacement. Keep prose rewriting out of automatic operations.
 
 ## Then: visual QA and accessibility depth
 
@@ -23,4 +27,4 @@ Build an epub.js/Playwright renderer with representative page sampling for large
 
 Verify the X4 Pro's installed firmware and supported transfer protocol before implementing CrossPoint delivery. Add a stable-file inbox watcher, stage caches, scheduling, per-device profiles, and a focused review UI after the inspection/repair corpus is established.
 
-No AI provider, API credential, firmware installation, background watcher, renderer, automatic metadata research, or typography transformation is required by this first version. Advanced checks are not represented as passing placeholders.
+No AI credential, firmware installation, background watcher, renderer, or typography transformation is required for the current workflow. Advanced checks are not represented as passing placeholders.

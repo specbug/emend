@@ -2,7 +2,7 @@
 
 A local, preservation-first EPUB workflow for macOS (including Apple Silicon) and Linux. Emend keeps original books unchanged, produces auditable quality reports, and publishes only after required checks pass. It also backs up and restores **complete Calibre libraries**, including their database, covers, metadata, custom columns, and every stored book format.
 
-This is milestone 1 of the design in [the roadmap](docs/roadmap.md). It is a working CLI foundation, not an AI editor or a device certification system.
+Emend includes the reliable foundation and exact-ISBN metadata curation from [the roadmap](docs/roadmap.md). It runs locally, records evidence for proposed edits, and keeps publication explicit. AI recommendations and device certification are not implemented.
 
 ## Install on your Mac
 
@@ -53,11 +53,59 @@ uv run emend report BOOK_ID --json
 
 IDs are SHA-256 hashes; commands accept unique prefixes of at least eight characters. `inspect` only reads the input. `ingest` stores an immutable-by-convention, read-only original, runs inspection and external validators, and creates JSON, text, and self-contained HTML reports. Open the reported `report.html` file locally to view it.
 
-The built-in checks cover ZIP structure and CRCs, bounded archive sizes, container/OPF/manifest/spine consistency, required metadata, EPUB 2 NCX and EPUB 3 navigation, duplicate IDs, local links and fragments, CSS resource links, corrupt raster images, and selected typography/accessibility warnings. All source resources and XHTML text are fingerprinted. The approved artifact is **byte-identical to the input**: this milestone performs no transformations.
+The built-in checks cover ZIP structure and CRCs, bounded archive sizes, container/OPF/manifest/spine consistency, required metadata, EPUB 2 NCX and EPUB 3 navigation, duplicate IDs, local links and fragments, CSS resource links, corrupt raster images, and selected typography/accessibility warnings. All source resources and XHTML text are fingerprinted. The initial approved artifact is **byte-identical to the input**. Metadata curation is a separate, explicit operation described below.
 
 Structural errors or failed required validators produce `FAILED`. Missing required tools produce `REVIEW_REQUIRED`. Neither state can publish. Optional check failures remain visible but do not block publication. EPUBCheck is required by default; do not disable it if you need standards validation. Visual QA is explicitly marked unimplemented, and no “Gold,” edition-match, or device-readiness certification is issued.
 
 Warnings about publisher styles, missing alt text, duplicate chapter text, or replacement characters are observations; Emend never silently rewrites them. Multi-rendition, DRM-encrypted, scripted, responsive-source-set, and remotely embedded content require manual review in this version. Font obfuscation is retained.
+
+## Research and curate metadata
+
+For an imported book with a valid ISBN:
+
+```sh
+uv run emend research BOOK_ID
+uv run emend proposals BOOK_ID
+uv run emend proposals BOOK_ID --json
+uv run emend apply BOOK_ID --safe
+uv run emend report BOOK_ID
+```
+
+Research queries Open Library and Google Books by exact ISBN, caches responses for seven days, and saves a separate, hash-registered plan with source URLs, timestamps, response fingerprints, and before/after proposals. Neither research nor apply publishes anything. Public lookup requests send the selected ISBN; Open Library author lookups send author record IDs. No EPUB content is uploaded. These public APIs need no key in this implementation, but their quotas and availability still apply.
+
+`--safe` selects only **missing publisher/date fields** corroborated by both providers, with matching ISBN, title, ordered authors, and no supplied language conflicts. Existing values and title/language changes always require review. Review source evidence, then explicitly select a proposal:
+
+```sh
+uv run emend apply BOOK_ID --approve PROPOSAL_ID
+# Repeat --approve for different fields; choose one value per field.
+uv run emend apply BOOK_ID --plan PLAN_ID --approve PROPOSAL_ID
+```
+
+Edits change only the selected plain OPF metadata nodes and the required EPUB 3 modification timestamp. Every other resource must retain its exact bytes; reading text and spine order must match. An independent OPF comparison rejects unselected metadata, attribute, or structural changes. Required validators run again before the candidate becomes active. Failed candidates leave the previous approved artifact/report in place and retain failure evidence under `reports/BOOK_ID/`. Ambiguous multi-valued or structured metadata requires manual editing.
+
+Plans are tied to the current artifact and research policy. Edited or stale plans are rejected; rerun research after applying a different selection. Repeating the same successful plan and selection returns the existing result. Prior artifacts remain in `versions/BOOK_ID/`, originals remain unchanged, and reports retain the plan ID, before/after values, evidence URLs, and parent revision.
+
+```sh
+uv run emend research BOOK_ID --offline   # Use fresh cached evidence only
+uv run emend research BOOK_ID --refresh   # Refresh provider evidence
+uv run emend research BOOK_ID --isbn ISBN # Choose among ISBNs already in the EPUB
+uv run emend reset-original BOOK_ID       # Revalidate the original as the active artifact
+```
+
+`reset-original` keeps history and external copies; if revalidation fails, publication is blocked until the required gates pass. Books without a valid ISBN currently need manual research. Failed providers remain visible and prevent safe proposals; research exits nonzero when a provider fails. Cover URLs are provenance-linked suggestions only: images are neither downloaded nor replaced. Author/identifier edits, title-only matching, AI recommendations, and typography changes are deferred.
+
+Optional configuration:
+
+```yaml
+metadata:
+  sources: [openlibrary, google_books]
+  cache_days: 7
+  request_timeout_seconds: 15
+```
+
+Publishing an edited artifact creates a separately identified revision in Calibre and a hash-named EPUB in Drive. It does **not** overwrite an existing Calibre entry or migrate annotations between revisions. Each revision/destination has its own retryable receipt. Full-library backup continues to preserve all entries and their stored data.
+
+Upgrading from 0.1: old reports require revalidation with the new engine (`reset-original` or re-ingest the original). SQLite research tables are added without deleting existing books or receipts. Back up the Emend data directory separately if you want to preserve its research/history; Calibre-library backups cover the Calibre library itself.
 
 ## Publish approved books to Calibre
 

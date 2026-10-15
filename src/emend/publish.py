@@ -153,16 +153,19 @@ def publish(book_id: str, targets: list[str], config: Config) -> dict:
         original = config.root / "originals" / f"{book_id}.epub"
         if (
             report.book_id != book_id
-            or report.artifact_sha256 != book_id
+            or not report.artifact_sha256
+            or report.inspection.source_sha256 != report.artifact_sha256
             or not artifact.is_file()
             or not original.is_file()
-            or sha256_file(artifact) != book_id
+            or sha256_file(artifact) != report.artifact_sha256
             or sha256_file(original) != book_id
         ):
             raise ValueError("Publication blocked: source or artifact hash mismatch.")
         for target in dict.fromkeys(targets):
             try:
                 key = target_key(target, config)
+                if report.artifact_sha256 != book_id:
+                    key += ":" + report.artifact_sha256
             except ValueError as exc:
                 results[target] = {"status": "pending", "receipt": {"error": str(exc)}}
                 continue
@@ -175,7 +178,7 @@ def publish(book_id: str, targets: list[str], config: Config) -> dict:
                 continue
             try:
                 receipt = (publish_calibre if target == "calibre" else publish_drive)(
-                    artifact, book_id, config
+                    artifact, report.artifact_sha256, config
                 )
                 store.save_receipt(book_id, key, "published", receipt)
                 results[target] = {"status": "published", "receipt": receipt}

@@ -3,6 +3,7 @@ import html
 from functools import lru_cache
 from importlib.resources import files
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from emend.models import Report
 
@@ -31,7 +32,13 @@ def report_text(report: Report) -> str:
         title,
         f"{report.state} · {report.book_id}",
         "",
-        "Original EPUB preserved. No editorial transformations applied.",
+        "Original EPUB preserved. "
+        + (
+            "Metadata changes recorded below."
+            if report.changes
+            else "No editorial transformations applied."
+        ),
+        *report.changes,
         "",
     ]
     for gate in report.gates:
@@ -71,6 +78,34 @@ def write_reports(report: Report, directory: Path) -> Path:
         )
         or "<li>No findings from the built-in inspector.</li>"
     )
+    changes = ""
+    for change in report.metadata_changes:
+        sources = []
+        for url in change.evidence_urls:
+            parsed = urlsplit(url)
+            if parsed.scheme != "https" or parsed.hostname not in {
+                "openlibrary.org",
+                "www.googleapis.com",
+            }:
+                continue
+            label = (
+                "Google Books"
+                if parsed.hostname == "www.googleapis.com"
+                else "Open Library author"
+                if "/authors/" in parsed.path
+                else "Open Library edition"
+            )
+            sources.append(f'<a href="{esc(url, quote=True)}">{label}</a>')
+        changes += (
+            f"<li><strong>{esc(change.field.capitalize())}</strong>"
+            f"<p>{esc('; '.join(change.before) or '(missing)')} → {esc('; '.join(change.after))}</p>"
+            f'<p class="sources">Sources: {" · ".join(sources)}</p></li>'
+        )
+    if not changes:
+        changes = (
+            "".join(f"<li>{esc(change)}</li>" for change in report.changes)
+            or "<li>No editorial changes.</li>"
+        )
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:">
@@ -80,12 +115,13 @@ def write_reports(report: Report, directory: Path) -> Path:
 </style></head><body>
 <main>
 <header><div class="brand">EMEND / QUALITY REPORT</div><h1>{esc(title)}</h1><p class="state">{report.state}</p>
-<p>Original preserved · No editorial changes</p><code>{report.book_id}</code></header>
+<p>Original preserved · {"Metadata curated" if report.changes else "No editorial changes"}</p><code>{report.book_id}</code></header>
 <h2>Publication gates</h2><table><thead><tr><th>Check</th><th>Result</th><th>Policy</th><th>Evidence summary</th></tr></thead><tbody>{gates}</tbody></table>
+<h2>Metadata changes</h2><ul>{changes}</ul>
 <h2>Inspection findings</h2><ul>{findings}</ul>
 <h2>Preservation</h2><p>{len(report.inspection.resource_hashes)} resources fingerprinted · {len(report.inspection.spine)} spine documents · {report.inspection.text_characters:,} text characters inventoried</p>
 <p>Artifact SHA-256: <code>{esc(report.artifact_sha256 or "No approved artifact")}</code></p>
-<footer>Generated {esc(report.created_at)} · Engine {esc(report.engine_version)}. This report records automated checks, not publication-quality or device certification. Visual QA and edition research are not implemented in this version.</footer>
+<footer>Generated {esc(report.created_at)} · Engine {esc(report.engine_version)}. This report records automated checks, not publication-quality or device certification. Visual QA is not implemented. Metadata research uses exact-ISBN evidence; cover suggestions are unverified.</footer>
 </main>
 </body></html>"""
     (directory / "report.html").write_text(page)
