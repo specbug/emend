@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from typing import Annotated
 
@@ -73,6 +74,10 @@ def doctor(config: ConfigOption = None):
             else "not configured",
             "drive_export": settings.publish.drive_remote or "not configured",
             "drive_backup": settings.publish.backup_remote or "not configured",
+            "meta_model": settings.ai_review.model,
+            "meta_api_key": "configured"
+            if os.environ.get("MODEL_API_KEY")
+            else "not configured (optional)",
             "visual_qa": "not implemented; no device-readiness certification",
         }
         typer.echo(json.dumps(results, indent=2))
@@ -282,6 +287,39 @@ def proposals(
         store = Store(load_config(config).root)
         result = load_plan(store, store.resolve(book_id)["id"], plan)
         typer.echo(result.model_dump_json(indent=2) if as_json else plan_text(result))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("ai-review")
+def ai_review_command(
+    book_id: str,
+    config: ConfigOption = None,
+    plan: str | None = None,
+    show: Annotated[
+        bool, typer.Option(help="Show saved advice without making a network request.")
+    ] = False,
+    refresh: Annotated[
+        bool,
+        typer.Option(
+            help="Request new advice even when cached; may incur another Meta API charge."
+        ),
+    ] = False,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Ask Meta to review collected metadata evidence. Sends metadata, never book content; advice only."""
+    from emend.research.ai_review import review_plan, review_text, show_review
+
+    try:
+        if show and refresh:
+            raise ValueError("--show and --refresh cannot be combined.")
+        settings = load_config(config)
+        result = (
+            show_review(book_id, settings, plan)
+            if show
+            else review_plan(book_id, settings, plan_id=plan, refresh=refresh)
+        )
+        typer.echo(result.model_dump_json(indent=2) if as_json else review_text(result))
     except (ValueError, OSError) as exc:
         fail(exc)
 

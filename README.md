@@ -2,7 +2,7 @@
 
 A local, preservation-first EPUB workflow for macOS (including Apple Silicon) and Linux. Emend keeps original books unchanged, produces auditable quality reports, and publishes only after required checks pass. It also backs up and restores **complete Calibre libraries**, including their database, covers, metadata, custom columns, and every stored book format.
 
-Emend includes the reliable foundation and exact-ISBN metadata curation from [the roadmap](docs/roadmap.md). It runs locally, records evidence for proposed edits, and keeps publication explicit. AI recommendations and device certification are not implemented.
+Emend includes the reliable foundation and exact-ISBN metadata curation from [the roadmap](docs/roadmap.md). It runs locally, records evidence for proposed edits, and keeps publication explicit. Optional Meta Model API reviews provide evidence-linked advice; device certification is not implemented.
 
 ## Install on your Mac
 
@@ -92,7 +92,7 @@ uv run emend research BOOK_ID --isbn ISBN # Choose among ISBNs already in the EP
 uv run emend reset-original BOOK_ID       # Revalidate the original as the active artifact
 ```
 
-`reset-original` keeps history and external copies; if revalidation fails, publication is blocked until the required gates pass. Books without a valid ISBN currently need manual research. Failed providers remain visible and prevent safe proposals; research exits nonzero when a provider fails. Cover URLs are provenance-linked suggestions only: images are neither downloaded nor replaced. Author/identifier edits, title-only matching, AI recommendations, and typography changes are deferred.
+`reset-original` keeps history and external copies; if revalidation fails, publication is blocked until the required gates pass. Books without a valid ISBN currently need manual research. Failed providers remain visible and prevent safe proposals; research exits nonzero when a provider fails. Cover URLs are provenance-linked suggestions only: images are neither downloaded nor replaced. Author/identifier edits, title-only matching, and typography changes are deferred.
 
 Optional configuration:
 
@@ -106,6 +106,42 @@ metadata:
 Publishing an edited artifact creates a separately identified revision in Calibre and a hash-named EPUB in Drive. It does **not** overwrite an existing Calibre entry or migrate annotations between revisions. Each revision/destination has its own retryable receipt. Full-library backup continues to preserve all entries and their stored data.
 
 Upgrading from 0.1: old reports require revalidation with the new engine (`reset-original` or re-ingest the original). SQLite research tables are added without deleting existing books or receipts. Back up the Emend data directory separately if you want to preserve its research/history; Calibre-library backups cover the Calibre library itself.
+
+## Ask Meta to review uncertain metadata
+
+After `research`, use [Meta Model API](https://dev.meta.ai/products/meta-model-api) for advice on proposals marked `review`:
+
+```sh
+uv run emend ai-review BOOK_ID
+uv run emend ai-review BOOK_ID --show         # Read saved advice without a network call
+uv run emend ai-review BOOK_ID --show --json  # Inspect the saved request, citations, and usage
+uv run emend ai-review BOOK_ID --refresh      # Explicitly request new advice
+```
+
+Create an API key in the [Meta developer dashboard](https://dev.meta.ai/api/auth/login) and supply it through the `MODEL_API_KEY` environment variable. Keep it out of YAML and the repository. In this cloud environment, enter the key securely in environment settings under the saved `MODEL_API_KEY` requirement, scoped to `api.meta.ai`; save and publish the changes. On your Mac, export the variable in the shell that runs Emend, preferably through your password manager. `emend doctor` reports presence without printing the key.
+
+The default is **`muse-spark-1.3`**, Meta's Standard mode (not Contributor mode). Meta bills API usage separately; this is optional and is not needed for local inspection, manual curation, publication, or Calibre backups. Model availability and pricing can change; see Meta's [models](https://dev.meta.ai/docs/models) and [pricing](https://dev.meta.ai/docs/pricing) documentation.
+
+Only the selected title/author/language/identifier/publisher/date metadata, normalized edition records, proposal values, source URLs/fingerprints, and unavailable-provider names are sent. EPUB files, chapter text, images, descriptions, local paths, and credentials are excluded from the prompt. The model has no tools or web access in this workflow. Requests use Meta's documented HTTPS endpoint, preserve proxy/TLS verification, reject redirects, and never fall back to another service or model.
+
+Advice can recommend an **existing** proposal, retain the current value, or mark it uncertain. Emend checks proposal coverage, cited record IDs, retained evidence, and conflicting recommendations. These checks establish where the advice came from; they do not establish that a model's factual judgment is correct. AI never changes a proposal's `safe` classification, approves an edit, or publishes a book. Inspect the evidence, then select a proposal explicitly:
+
+```sh
+uv run emend proposals BOOK_ID --plan PLAN_ID
+uv run emend apply BOOK_ID --plan PLAN_ID --approve PROPOSAL_ID
+```
+
+Completed reviews are reused for the same plan and request. `--refresh` can incur another API charge. Failed or timed-out calls are not automatically retried; a timed-out request may already have been billed. Truncated/refused responses, invented proposal IDs, unsupported citations, and malformed JSON are rejected while the previous book state remains intact. Research, advice, and approved artifacts remain separate records. Saved review JSON lives under `research/BOOK_ID/ai-reviews/` and records the exact request, model, prompt version, response hash, token usage when supplied, and the structured answer; authentication headers and internal reasoning are not saved.
+
+```yaml
+ai_review:
+  model: muse-spark-1.3
+  reasoning_effort: medium
+  max_completion_tokens: 4096
+  request_timeout_seconds: 90
+```
+
+The client has been tested against the documented contract using local response fixtures. Authenticated live generation still needs a configured Meta API key. Source providers can also be quota-limited: Google Books currently returns HTTP 429 from the development environment. Missing corroboration remains visible and prevents safe proposals.
 
 ## Publish approved books to Calibre
 

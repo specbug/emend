@@ -133,7 +133,7 @@ def research(
                 errors[provider] = str(exc)
         notes = [
             "Cover URLs are edition-linked suggestions only. No cover is downloaded or replaced.",
-            "No AI service was called; uncertain cases require explicit review.",
+            "Research does not call AI. Optional emend ai-review provides advice; uncertain cases still require explicit review.",
         ]
         if not editions:
             notes.append(

@@ -31,6 +31,11 @@ class Store:
                     updated_at TEXT NOT NULL, receipt TEXT NOT NULL,
                     PRIMARY KEY(book_id, target_key)
                 );
+                CREATE TABLE IF NOT EXISTS ai_reviews (
+                    book_id TEXT NOT NULL, plan_id TEXT NOT NULL, request_key TEXT NOT NULL,
+                    created_at TEXT NOT NULL, path TEXT NOT NULL, sha256 TEXT NOT NULL,
+                    PRIMARY KEY(book_id, plan_id, request_key)
+                );
                 CREATE TABLE IF NOT EXISTS research_plans (
                     id TEXT PRIMARY KEY, book_id TEXT NOT NULL, created_at TEXT NOT NULL,
                     path TEXT NOT NULL, sha256 TEXT NOT NULL
@@ -144,3 +149,24 @@ class Store:
         if row is None:
             raise ValueError("No matching research plan. Run emend research first.")
         return dict(row)
+
+    def save_ai_review(self, book_id: str, plan_id: str, request_key: str, path: Path, digest: str):
+        with self.db() as db:
+            db.execute(
+                "INSERT OR REPLACE INTO ai_reviews VALUES (?, ?, ?, ?, ?, ?)",
+                (book_id, plan_id, request_key, now(), str(path), digest),
+            )
+
+    def ai_review(self, book_id: str, plan_id: str, request_key: str | None = None) -> dict | None:
+        with self.db() as db:
+            if request_key:
+                row = db.execute(
+                    "SELECT * FROM ai_reviews WHERE book_id=? AND plan_id=? AND request_key=?",
+                    (book_id, plan_id, request_key),
+                ).fetchone()
+            else:
+                row = db.execute(
+                    "SELECT * FROM ai_reviews WHERE book_id=? AND plan_id=? ORDER BY created_at DESC LIMIT 1",
+                    (book_id, plan_id),
+                ).fetchone()
+        return dict(row) if row else None
