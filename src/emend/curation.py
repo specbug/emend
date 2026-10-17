@@ -261,6 +261,7 @@ def apply_proposals(
                         f"{p.field}: {'; '.join(p.before) or '(missing)'} → {'; '.join(p.after)}. Evidence: {', '.join(p.evidence_urls)}"
                         for p in selected
                     ],
+                    cover_changes=previous.cover_changes,
                     metadata_changes=previous.metadata_changes
                     + [
                         MetadataChange(

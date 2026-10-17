@@ -257,6 +257,8 @@ def research(
     ] = None,
     offline: bool = False,
     refresh: bool = False,
+    edition: str | None = None,
+    discovery: str | None = None,
 ):
     """Collect exact-ISBN evidence and proposals; never edit or publish a book."""
     from emend.research.service import plan_text
@@ -264,7 +266,13 @@ def research(
 
     try:
         result = research_book(
-            book_id, load_config(config), isbn=isbn, offline=offline, refresh=refresh
+            book_id,
+            load_config(config),
+            isbn=isbn,
+            offline=offline,
+            refresh=refresh,
+            edition_id=edition,
+            discovery_id=discovery,
         )
         typer.echo(plan_text(result))
         if result.provider_errors:
@@ -287,6 +295,53 @@ def proposals(
         store = Store(load_config(config).root)
         result = load_plan(store, store.resolve(book_id)["id"], plan)
         typer.echo(result.model_dump_json(indent=2) if as_json else plan_text(result))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command()
+def discover(
+    book_id: str,
+    config: ConfigOption = None,
+    title: str | None = None,
+    author: str | None = None,
+    offline: bool = False,
+    refresh: bool = False,
+):
+    """Find candidate editions for an EPUB without an ISBN; never select one automatically."""
+    from emend.research.discovery import discover as discover_book
+    from emend.research.discovery import discovery_text
+
+    try:
+        result = discover_book(
+            book_id,
+            load_config(config),
+            title=title,
+            author=author,
+            offline=offline,
+            refresh=refresh,
+        )
+        typer.echo(discovery_text(result))
+        if result.provider_errors:
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command()
+def editions(
+    book_id: str,
+    config: ConfigOption = None,
+    discovery: str | None = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Read saved edition candidates and their differences from the EPUB."""
+    from emend.research.discovery import discovery_text, load_discovery
+
+    try:
+        store = Store(load_config(config).root)
+        result = load_discovery(store, store.resolve(book_id)["id"], discovery)
+        typer.echo(result.model_dump_json(indent=2) if as_json else discovery_text(result))
     except (ValueError, OSError) as exc:
         fail(exc)
 
@@ -320,6 +375,75 @@ def ai_review_command(
             else review_plan(book_id, settings, plan_id=plan, refresh=refresh)
         )
         typer.echo(result.model_dump_json(indent=2) if as_json else review_text(result))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("cover-review")
+def cover_review_command(
+    book_id: str,
+    config: ConfigOption = None,
+    plan: str | None = None,
+    image: Path | None = None,
+    source_note: str | None = None,
+):
+    """Prepare a local artwork comparison from research candidates or a supplied image."""
+    from emend.covers import cover_review, cover_review_text
+
+    try:
+        settings = load_config(config)
+        result = cover_review(book_id, settings, plan_id=plan, image=image, source_note=source_note)
+        typer.echo(cover_review_text(result))
+        row = Store(settings.root).document(result.book_id, "cover-review", result.id)
+        typer.echo(f"\nComparison: {Path(row['path']).with_suffix('.html')}")
+        if result.errors or not result.candidates:
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("covers")
+def covers_command(
+    book_id: str,
+    config: ConfigOption = None,
+    review: str | None = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Read a saved cover review without downloading images."""
+    from emend.covers import cover_review_text, load_cover_review
+
+    try:
+        store = Store(load_config(config).root)
+        result = load_cover_review(store, store.resolve(book_id)["id"], review)
+        typer.echo(result.model_dump_json(indent=2) if as_json else cover_review_text(result))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("apply-cover")
+def apply_cover_command(
+    book_id: str,
+    review: Annotated[str, typer.Option(help="Saved cover review ID.")],
+    approve: Annotated[
+        str, typer.Option(help="Candidate ID whose artwork and edition you approve.")
+    ],
+    config: ConfigOption = None,
+    allow_smaller: bool = False,
+    allow_aspect_change: bool = False,
+):
+    """Replace one declared cover, preserve unrelated resources, and rerun quality gates."""
+    from emend.cover_apply import apply_cover
+
+    try:
+        result = apply_cover(
+            book_id,
+            load_config(config),
+            review_id=review,
+            approve=approve,
+            allow_smaller=allow_smaller,
+            allow_aspect_change=allow_aspect_change,
+        )
+        typer.echo(report_text(result))
     except (ValueError, OSError) as exc:
         fail(exc)
 

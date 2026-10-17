@@ -2,7 +2,7 @@
 
 A local, preservation-first EPUB workflow for macOS (including Apple Silicon) and Linux. Emend keeps original books unchanged, produces auditable quality reports, and publishes only after required checks pass. It also backs up and restores **complete Calibre libraries**, including their database, covers, metadata, custom columns, and every stored book format.
 
-Emend includes the reliable foundation and exact-ISBN metadata curation from [the roadmap](docs/roadmap.md). It runs locally, records evidence for proposed edits, and keeps publication explicit. Optional Meta Model API reviews provide evidence-linked advice; device certification is not implemented.
+Emend includes the reliable foundation, evidence-backed metadata curation, and explicit edition/cover review from [the roadmap](docs/roadmap.md). It runs locally, records evidence for proposed edits, and keeps publication explicit. Optional Meta Model API reviews provide evidence-linked advice; device certification is not implemented.
 
 ## Install on your Mac
 
@@ -92,7 +92,7 @@ uv run emend research BOOK_ID --isbn ISBN # Choose among ISBNs already in the EP
 uv run emend reset-original BOOK_ID       # Revalidate the original as the active artifact
 ```
 
-`reset-original` keeps history and external copies; if revalidation fails, publication is blocked until the required gates pass. Books without a valid ISBN currently need manual research. Failed providers remain visible and prevent safe proposals; research exits nonzero when a provider fails. Cover URLs are provenance-linked suggestions only: images are neither downloaded nor replaced. Author/identifier edits, title-only matching, and typography changes are deferred.
+`reset-original` keeps history and external copies; if revalidation fails, publication is blocked until the required gates pass. Books without a valid ISBN use the edition-discovery workflow below. Failed providers remain visible and prevent safe proposals; research exits nonzero when a provider fails. Research itself only records cover URLs. The separate cover-review workflow downloads candidates and supports explicit replacement. Author/identifier edits and typography changes are deferred.
 
 Optional configuration:
 
@@ -106,6 +106,51 @@ metadata:
 Publishing an edited artifact creates a separately identified revision in Calibre and a hash-named EPUB in Drive. It does **not** overwrite an existing Calibre entry or migrate annotations between revisions. Each revision/destination has its own retryable receipt. Full-library backup continues to preserve all entries and their stored data.
 
 Upgrading from 0.1: old reports require revalidation with the new engine (`reset-original` or re-ingest the original). SQLite research tables are added without deleting existing books or receipts. Back up the Emend data directory separately if you want to preserve its research/history; Calibre-library backups cover the Calibre library itself.
+
+## Discover editions when an EPUB has no ISBN
+
+The 0.3 edition/cover features are implemented but have not had runtime or regression testing yet; that validation is deferred to a later development pass. See [the deferred checks](docs/deferred-validation.md).
+
+```sh
+uv run emend discover BOOK_ID
+uv run emend editions BOOK_ID
+uv run emend editions BOOK_ID --json
+uv run emend research BOOK_ID --discovery DISCOVERY_ID --edition RECORD_ID
+uv run emend proposals BOOK_ID
+```
+
+`discover` searches Open Library and Google Books using the existing title and author. Supply `--title "…" --author "…"` when metadata is absent or multi-valued; these arguments change the query, not the EPUB. Use `--offline` for fresh cached responses or `--refresh` to fetch new evidence. If a valid ISBN already exists, use exact-ISBN `research` instead.
+
+Results show title/author/language/publisher/date agreements and differences. Open Library work-level search results are expanded into concrete edition records; they are never used as edition metadata directly. Searches are bounded to the first five Open Library work results (up to two editions each) and ten Google Books records. Ordering is not a confidence score, and other editions may exist.
+
+Select one saved record explicitly with `research --edition`. The resulting plan records `match_mode: reviewed_edition`, the selected record, discovery ID, and source evidence. **Every resulting metadata edit needs explicit approval**, even when fields agree. Candidate ISBNs stay evidence about the candidate; they are never inserted into the EPUB. Meta review sees the match mode and cannot turn a search selection into automatic approval. Stale or altered discoveries must be rerun.
+
+## Compare and replace an existing cover
+
+After research, prepare a self-contained comparison page from the recorded Open Library cover candidates:
+
+```sh
+uv run emend cover-review BOOK_ID --plan PLAN_ID
+uv run emend covers BOOK_ID
+uv run emend covers BOOK_ID --review REVIEW_ID --json
+```
+
+Open the reported `review.html` locally. It shows current artwork and candidates, source edition details, native dimensions, byte counts, and a perceptual-hash distance. That distance is a rough layout comparison; it does not prove that the artwork or edition matches. Images are sorted by format compatibility and pixel area, not automatically selected. Inspect the title, edition, crop, artwork, and small text yourself.
+
+You can also supply a local image with a provenance note; this needs no metadata provider or AI key:
+
+```sh
+uv run emend cover-review BOOK_ID --image /path/to/cover.jpg --source-note "Publisher-supplied cover for this edition"
+uv run emend apply-cover BOOK_ID --review REVIEW_ID --approve CANDIDATE_ID
+```
+
+`--approve` means you have reviewed the candidate's artwork and edition. This path supports **one already-declared JPEG or PNG cover**, and the replacement must have the same format. It leaves the resource path, manifest, cover-page XHTML, CSS, and all unrelated resource bytes unchanged. It does not invent cover declarations, alter SVG wrappers, transcode files, upscale thumbnails, or rewrite layout. JPEG/PNG candidates are bounded to 20 MiB and 40 megapixels; animated images, unusual colour modes, and EXIF-rotated candidates need manual preparation before applying.
+
+Smaller images and aspect-ratio changes above 5% are blocked by default. After checking the consequences, `--allow-smaller` and `--allow-aspect-change` record explicit exceptions. There is no automatic visual or device-readiness certification. Existing cover-page dimensions may distort a candidate with a different aspect ratio, so that exception needs particular review.
+
+Applying a cover advances the EPUB 3 modification timestamp, checks content/resource invariants, and reruns required validators. On failure it retains the previous approved artifact and saves rejection evidence. Original bytes and prior revisions remain available; quality reports record old/new image hashes, dimensions, provenance, and any exceptions. Repeating the same successful selection is idempotent. Replacing a cover creates a new artifact revision, so the normal explicit publishing and full-library backup rules still apply.
+
+Remote review downloads up to eight recorded Open Library covers; failures remain visible. `covers` reads a saved review without downloading again. Downloaded images and local inputs are retained by hash, and altered review files/assets cannot be applied. Preview images are scaled only in the report; replacement bytes stay untouched.
 
 ## Ask Meta to review uncertain metadata
 

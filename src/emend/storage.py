@@ -31,6 +31,10 @@ class Store:
                     updated_at TEXT NOT NULL, receipt TEXT NOT NULL,
                     PRIMARY KEY(book_id, target_key)
                 );
+                CREATE TABLE IF NOT EXISTS review_documents (
+                    id TEXT PRIMARY KEY, book_id TEXT NOT NULL, kind TEXT NOT NULL,
+                    created_at TEXT NOT NULL, path TEXT NOT NULL, sha256 TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS ai_reviews (
                     book_id TEXT NOT NULL, plan_id TEXT NOT NULL, request_key TEXT NOT NULL,
                     created_at TEXT NOT NULL, path TEXT NOT NULL, sha256 TEXT NOT NULL,
@@ -170,3 +174,26 @@ class Store:
                     (book_id, plan_id),
                 ).fetchone()
         return dict(row) if row else None
+
+    def save_document(self, identifier: str, book_id: str, kind: str, path: Path, digest: str):
+        with self.db() as db:
+            db.execute(
+                "INSERT INTO review_documents VALUES (?, ?, ?, ?, ?, ?)",
+                (identifier, book_id, kind, now(), str(path), digest),
+            )
+
+    def document(self, book_id: str, kind: str, identifier: str | None = None) -> dict:
+        with self.db() as db:
+            if identifier:
+                row = db.execute(
+                    "SELECT * FROM review_documents WHERE book_id=? AND kind=? AND id=?",
+                    (book_id, kind, identifier),
+                ).fetchone()
+            else:
+                row = db.execute(
+                    "SELECT * FROM review_documents WHERE book_id=? AND kind=? ORDER BY created_at DESC LIMIT 1",
+                    (book_id, kind),
+                ).fetchone()
+        if row is None:
+            raise ValueError(f"No matching {kind} document for this book.")
+        return dict(row)

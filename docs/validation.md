@@ -2,9 +2,13 @@
 
 Validated in the Linux cloud development environment with Python 3.12, Java 21, and the official EPUBCheck 5.3.0 distribution.
 
-## Executed checks
+## Current development branch
 
-- The metadata curation branch passes 135 tests locally, including real EPUBCheck validation of edited EPUB 2 and EPUB 3 artifacts. Research fixtures cover ISBN checksums, exact-edition filtering, conservative reconciliation, source provenance, cache age/integrity, bounded responses, and redirect restrictions. Apply tests cover stale/tampered plans, explicit review, resource/package preservation, validator rejection, database rollback, original reset, and revision-aware publication.
+Edition discovery and cover review/replacement (0.3) have implementation and static lint/format checks only. Runtime/regression tests, live provider checks, and visual report review were intentionally deferred at the user's request. The 135-test result below belongs to the merged 0.2 metadata/Meta-review work and is not validation of these new paths. See [the pending checklist](deferred-validation.md).
+
+## Previously executed checks
+
+- The merged metadata curation/Meta-review work passed 135 tests locally, including real EPUBCheck validation of edited EPUB 2 and EPUB 3 artifacts. Research fixtures cover ISBN checksums, exact-edition filtering, conservative reconciliation, source provenance, cache age/integrity, bounded responses, and redirect restrictions. Apply tests cover stale/tampered plans, explicit review, resource/package preservation, validator rejection, database rollback, original reset, and revision-aware publication.
 - Meta review tests cover the documented structured-output request, scoped authentication, source-only prompts, cached advice, explicit refresh, stale/tampered plans and reviews, unknown/conflicting citations, malformed/refused/truncated outputs, redirect rejection, timeouts, quota/auth errors, request/response limits, adversarial source text, CLI behavior, and unchanged book approval state. These tests use local transport fixtures, not live model generation.
 - Regression tests cover EPUB 2/3 structure, footnotes and images, broken URLs/fragments, missing resources, duplicate IDs, ZIP traversal, XML entities, malformed input, typography observations, and content fingerprints.
 - Pipeline tests cover exact byte preservation, repeat ingestion, missing/failed/timed-out validators, revocation after failed revalidation, source/artifact tampering, policy changes, escaped HTML reports, and CLI exit codes.

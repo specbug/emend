@@ -38,7 +38,11 @@ def identity_matches(edition: Edition, metadata: dict[str, list[str]]) -> bool:
 
 
 def reconcile(
-    metadata: dict[str, list[str]], editions: list[Edition], errors: dict[str, str]
+    metadata: dict[str, list[str]],
+    editions: list[Edition],
+    errors: dict[str, str],
+    *,
+    allow_safe: bool = True,
 ) -> list[Proposal]:
     proposals = []
     all_match = bool(editions) and all(identity_matches(edition, metadata) for edition in editions)
@@ -54,7 +58,8 @@ def reconcile(
                 continue
             providers = {edition.provider for edition, _ in group}
             safe = (
-                not any(before)
+                allow_safe
+                and not any(before)
                 and field in {"publisher", "date"}
                 and len(providers) >= 2
                 and len(groups) == 1
@@ -74,6 +79,10 @@ def reconcile(
                 )
             else:
                 reason = "Insufficient corroboration, a failed provider, or a field that always requires review."
+            if not allow_safe:
+                reason = "Manually selected search candidate. " + reason.replace(
+                    "An exact-ISBN result", "The selected record"
+                )
             record_ids = sorted({edition.record_id for edition, _ in group})
             after = [group[0][1]]
             identifier = hashlib.sha256(
@@ -104,6 +113,8 @@ def research(
     offline=False,
     refresh=False,
     client: EvidenceClient | None = None,
+    edition_id: str | None = None,
+    discovery_id: str | None = None,
 ) -> ResearchPlan:
     store = Store(config.root)
     with store.locked():
@@ -118,23 +129,59 @@ def research(
         if sha256_file(source) != expected:
             raise ValueError("Research input hash mismatch; revalidate the book first.")
         inspection = inspect_epub(source, config.limits)
-        selected = choose_isbn(inspection.metadata.get("identifier", []), isbn)
-        unknown = set(config.metadata.sources) - PROVIDERS.keys()
-        if unknown or not config.metadata.sources:
-            raise ValueError("Metadata sources must include openlibrary and/or google_books.")
-        client = client or EvidenceClient(
-            config.root / "cache" / "metadata", config.metadata, offline=offline, refresh=refresh
-        )
-        editions, errors = [], {}
-        for provider in dict.fromkeys(config.metadata.sources):
-            try:
-                editions.extend(PROVIDERS[provider](selected, client))
-            except (ProviderError, OSError, TypeError, KeyError) as exc:
-                errors[provider] = str(exc)
+        if edition_id:
+            from emend.research.discovery import load_discovery
+
+            if isbn is not None or refresh:
+                raise ValueError(
+                    "Edition selection cannot be combined with --isbn or --refresh. Refresh discovery separately."
+                )
+            discovery = load_discovery(store, book_id, discovery_id)
+            if (
+                discovery.artifact_sha256 != expected
+                or discovery.engine_version != ENGINE_VERSION
+                or discovery.policy_sha256 != config.metadata.fingerprint()
+            ):
+                raise ValueError("Discovery is stale or policy changed; run discover again.")
+            matches = [
+                item.edition
+                for item in discovery.candidates
+                if item.edition.record_id == edition_id
+            ]
+            if len(matches) != 1:
+                raise ValueError("Choose one record ID from the saved discovery.")
+            editions, errors = matches, discovery.provider_errors
+            selected = editions[0].isbn
+            documents = discovery.documents
+            discovery_id = discovery.id
+        else:
+            if discovery_id:
+                raise ValueError("--discovery requires --edition RECORD_ID.")
+            selected = choose_isbn(inspection.metadata.get("identifier", []), isbn)
+            unknown = set(config.metadata.sources) - PROVIDERS.keys()
+            if unknown or not config.metadata.sources:
+                raise ValueError("Metadata sources must include openlibrary and/or google_books.")
+            client = client or EvidenceClient(
+                config.root / "cache" / "metadata",
+                config.metadata,
+                offline=offline,
+                refresh=refresh,
+            )
+            editions, errors = [], {}
+            for provider in dict.fromkeys(config.metadata.sources):
+                try:
+                    editions.extend(PROVIDERS[provider](selected, client))
+                except (ProviderError, OSError, TypeError, KeyError) as exc:
+                    errors[provider] = str(exc)
+            documents = list(client.documents.values())
         notes = [
             "Cover URLs are edition-linked suggestions only. No cover is downloaded or replaced.",
             "Research does not call AI. Optional emend ai-review provides advice; uncertain cases still require explicit review.",
         ]
+        if edition_id:
+            notes.append(
+                "Edition selected explicitly from title/author discovery; all edits require review. EPUB identifiers remain unchanged."
+            )
         if not editions:
             notes.append(
                 "No exact-ISBN edition evidence was retrieved. No changes can be proposed."
@@ -149,8 +196,11 @@ def research(
             isbn=selected,
             metadata=inspection.metadata,
             editions=editions,
-            documents=list(client.documents.values()),
-            proposals=reconcile(inspection.metadata, editions, errors),
+            documents=documents,
+            proposals=reconcile(inspection.metadata, editions, errors, allow_safe=not edition_id),
+            match_mode="reviewed_edition" if edition_id else "exact_isbn",
+            selected_record_id=edition_id,
+            discovery_id=discovery_id,
             provider_errors=errors,
             notes=notes,
         )
@@ -183,8 +233,8 @@ def load_plan(store: Store, book_id: str, identifier: str | None = None) -> Rese
 def plan_text(plan: ResearchPlan) -> str:
     lines = [
         f"Research plan {plan.id}",
-        f"Book {plan.book_id} · ISBN {plan.isbn}",
-        f"{len(plan.editions)} exact-ISBN records · {len(plan.proposals)} proposals",
+        f"Book {plan.book_id} · ISBN {plan.isbn or '(not supplied)'} · {plan.match_mode}",
+        f"{len(plan.editions)} edition records · {len(plan.proposals)} proposals",
         "",
     ]
     for proposal in plan.proposals:
