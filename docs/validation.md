@@ -4,7 +4,9 @@ Validated in the Linux cloud development environment with Python 3.12, Java 21, 
 
 ## Current development branch
 
-Edition discovery and cover review/replacement (0.3) have implementation and static lint/format checks only. Runtime/regression tests, live provider checks, and visual report review were intentionally deferred at the user's request. The 135-test result below belongs to the merged 0.2 metadata/Meta-review work and is not validation of these new paths. See [the pending checklist](deferred-validation.md).
+Edition discovery and cover review/replacement (0.3) now have 22 additional tests. The full suite passes **157 tests**, including official EPUBCheck 5.3.0 checks on both EPUB 2 and EPUB 3 cover replacements. Tests exercise explicit edition selection, review-only proposals, identifier preservation, missing ISBNs, provider failure, stale/tampered records, cover resource preservation, size/aspect exceptions, invalid images, validator failure, database rollback, unrelated-resource mutation, and metadata/cover history.
+
+On 2026-10-17, live Open Library title/author search expanded results into five edition records with 15 retained evidence documents. Results included translations and collections; they remain unconfirmed candidates. An actual recorded cover URL downloaded a verified 326 × 500 JPEG through the restricted downloader. The comparison report was rendered in Chromium at 1280 px and 390 px widths: images loaded at natural proportions and neither viewport had horizontal overflow. Lint, formatting, and package build also pass. See [remaining validation](deferred-validation.md) for limits.
 
 ## Previously executed checks
 
@@ -40,7 +42,7 @@ For another machine, use its actual EPUBCheck JAR path. Without `EMEND_TEST_EPUB
 - The foundation and initial metadata-curation commits passed hosted macOS and Linux CI. Meta review checks are tracked on PR #2.
 - On 2026-10-17, live Open Library parsing resolved ISBN 9780140328721 to edition OL7353617M (*Fantastic Mr. Fox*), author Roald Dahl, publisher/date/language, and cover provenance, retaining two evidence documents. Google Books was reachable but returned HTTP 429; a successful live Google response remains unverified.
 - Meta documentation was read successfully on 2026-10-17: [Chat Completions](https://dev.meta.ai/docs/protocols/chat-completions), [structured output](https://dev.meta.ai/docs/structured-output), and [authentication](https://dev.meta.ai/docs/authentication). The configured client uses `https://api.meta.ai/v1/chat/completions` and `MODEL_API_KEY`. No key was available for authenticated generation; its secret requirement and `api.meta.ai` destination were saved for secure entry.
-- Cover replacement, visual EPUB rendering, general structural repair, and XTEINK transfer remain deferred. No device compatibility or publication-quality certification is claimed.
+- Visual EPUB rendering, general structural repair, and XTEINK transfer remain deferred. No device compatibility or publication-quality certification is claimed.
 
 ## Report presentation
 

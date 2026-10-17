@@ -19,13 +19,13 @@ Exact-ISBN Open Library/Google Books research, cached responses, retained eviden
 
 `ai-review` uses [Meta Model API](https://dev.meta.ai/products/meta-model-api), with Muse Spark 1.3 Standard mode by default. It reviews only collected metadata evidence, cites existing proposal/record IDs, saves bounded structured advice with request provenance, and never promotes proposals to safe or applies them. Cached reviews avoid repeated calls; explicit refresh and retries remain user-controlled. The documented API contract and failure handling are tested; authenticated generation awaits `MODEL_API_KEY`.
 
-## Implemented, awaiting validation: edition discovery and cover review
+## Delivered: edition discovery and cover review
 
 Version 0.3 adds title/author discovery for books without ISBNs, field-by-field edition comparisons, explicit selection into review-only research plans, and match-mode context for Meta advice. Open Library search work records are expanded into edition records before selection.
 
 Cover review downloads bounded recorded candidates or accepts a local image, produces a local side-by-side page with edition provenance and dimension/perceptual-hash hints, and supports explicit replacement of one already-declared JPEG/PNG cover in the same format. Unrelated resources and reading text remain preservation invariants; required validators and rollback remain part of the application path. Automatic artwork certification, missing-cover creation, format conversion, and layout repair are deferred.
 
-Runtime testing, new regression coverage, live search/download checks, and report-layout iterations were deferred at the user's request. See [deferred validation](deferred-validation.md) before treating these additions as verified.
+The complete 157-test suite, including official EPUBCheck integration, passes locally. Live Open Library search and cover download, plus narrow/wide Chromium comparison layouts, were exercised. See [validation evidence](validation.md) and [remaining checks](deferred-validation.md).
 
 ## Then: visual QA and accessibility depth
 

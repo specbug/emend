@@ -126,7 +126,7 @@ def image_details(data: bytes) -> dict:
                 oriented = ImageOps.exif_transpose(image)
                 width, height = oriented.size
                 gray = oriented.convert("L").resize((9, 8), Image.Resampling.LANCZOS)
-                pixels = list(gray.getdata())
+                pixels = list(gray.tobytes())
                 bits = sum(
                     (pixels[y * 9 + x] > pixels[y * 9 + x + 1]) << (y * 8 + x)
                     for y in range(8)
