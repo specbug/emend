@@ -24,6 +24,12 @@ EMEND_TEST_PLAYWRIGHT=1 EMEND_TEST_EPUBCHECK_JAR=/path/to/epubcheck.jar uv run -
 
 For an existing browser, use `EMEND_TEST_CHROMIUM=/path/to/chromium` instead of `EMEND_TEST_PLAYWRIGHT`. Browser tests skip explicitly without the optional dependency and one of these opt-ins. The renderer is scrolling XHTML sampling; it does not certify pagination, device rendering, accessibility, or publication quality.
 
+## Library overview
+
+The combined branch passes **187 tests**. Nine overview tests cover empty and populated libraries, non-mutating reads, proposal/application history, missing or changed evidence, policy changes, incomplete visual captures, Meta advice tied to intact plans, escaped metadata, local-link containment, and paging. A mixed failed/validated fixture library was rendered in Chromium at 1280 px and 390 px with no horizontal overflow; every generated report link resolved to a local file. Linux/macOS CI for the visual-review base is green; the overview is checked on its own stacked PR.
+
+The overview checks registered JSON hashes but does not hash all EPUBs, covers, or screenshots. It is a snapshot of recorded state; the relevant workflow performs full checks before editing or publishing.
+
 ## Previously executed checks
 
 - The merged metadata curation/Meta-review work passed 135 tests locally, including real EPUBCheck validation of edited EPUB 2 and EPUB 3 artifacts. Research fixtures cover ISBN checksums, exact-edition filtering, conservative reconciliation, source provenance, cache age/integrity, bounded responses, and redirect restrictions. Apply tests cover stale/tampered plans, explicit review, resource/package preservation, validator rejection, database rollback, original reset, and revision-aware publication.

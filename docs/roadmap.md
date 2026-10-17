@@ -31,6 +31,10 @@ The complete 157-test suite, including official EPUBCheck integration, passes lo
 
 Version 0.4 adds optional Playwright/Chromium sampling of representative spine/navigation documents, compact/wide viewports, bounded vertical screenshots, geometry observations, and self-contained reports tied to an artifact hash. Scripts and network access are disabled, publisher resources remain unchanged, and no approval state is promoted. These are scrolling browser documents; EPUB pagination and device emulation remain future work.
 
+## Implemented: local library overview
+
+`library` builds a local HTML/JSON index of recorded book states and the latest review evidence, with bounded pages for larger libraries. It shows stale/incomplete/unavailable records, applied metadata/cover history, pending proposals, and inspection commands. It reads existing evidence without provider calls, browser installation, editing, or publishing.
+
 ## Next: pagination and accessibility depth
 
 Add a paginated EPUB renderer and calibrate it against real reader screenshots. Validate the Ace integration against real books, extend font/footnote/layout coverage, and add optional multimodal advice. Actual Apple Books and XTEINK checks remain necessary before making device claims.

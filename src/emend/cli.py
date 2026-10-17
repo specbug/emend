@@ -549,5 +549,29 @@ def visuals_command(
         fail(exc)
 
 
+@app.command("library")
+def library_command(
+    config: ConfigOption = None,
+    limit: Annotated[int, typer.Option(min=1, max=1000)] = 200,
+    offset: Annotated[int, typer.Option(min=0)] = 0,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Create an offline overview of books and their latest recorded reviews."""
+    from emend.library import library_snapshot, write_library
+
+    try:
+        settings = load_config(config)
+        snapshot = library_snapshot(settings, limit, offset)
+        if as_json:
+            typer.echo(snapshot.model_dump_json(indent=2))
+        else:
+            path = write_library(snapshot, settings)
+            typer.echo(
+                f"Showing {len(snapshot.books)} of {snapshot.total_books} books. Open: {path}"
+            )
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 if __name__ == "__main__":
     app()
