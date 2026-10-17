@@ -27,9 +27,13 @@ Cover review downloads bounded recorded candidates or accepts a local image, pro
 
 The complete 157-test suite, including official EPUBCheck integration, passes locally. Live Open Library search and cover download, plus narrow/wide Chromium comparison layouts, were exercised. See [validation evidence](validation.md) and [remaining checks](deferred-validation.md).
 
-## Then: visual QA and accessibility depth
+## Implemented: offline visual document review
 
-Build an epub.js/Playwright renderer with representative page sampling for large and small screens, geometric checks, and reproducible screenshots. Validate the Ace integration against real books and add optional multimodal review. Calibrate browser profiles against actual Apple Books and XTEINK screenshots before making device claims.
+Version 0.4 adds optional Playwright/Chromium sampling of representative spine/navigation documents, compact/wide viewports, bounded vertical screenshots, geometry observations, and self-contained reports tied to an artifact hash. Scripts and network access are disabled, publisher resources remain unchanged, and no approval state is promoted. These are scrolling browser documents; EPUB pagination and device emulation remain future work.
+
+## Next: pagination and accessibility depth
+
+Add a paginated EPUB renderer and calibrate it against real reader screenshots. Validate the Ace integration against real books, extend font/footnote/layout coverage, and add optional multimodal advice. Actual Apple Books and XTEINK checks remain necessary before making device claims.
 
 ## Later: device delivery and automation
 

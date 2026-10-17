@@ -129,7 +129,7 @@ def write_reports(report: Report, directory: Path) -> Path:
 <h2>Inspection findings</h2><ul>{findings}</ul>
 <h2>Preservation</h2><p>{len(report.inspection.resource_hashes)} resources fingerprinted · {len(report.inspection.spine)} spine documents · {report.inspection.text_characters:,} text characters inventoried</p>
 <p>Artifact SHA-256: <code>{esc(report.artifact_sha256 or "No approved artifact")}</code></p>
-<footer>Generated {esc(report.created_at)} · Engine {esc(report.engine_version)}. This report records automated checks, not publication-quality or device certification. Visual QA is not implemented. Edition identity and artwork selection require evidence review; neither is certified by automated checks.</footer>
+<footer>Generated {esc(report.created_at)} · Engine {esc(report.engine_version)}. This report records automated checks, not publication-quality or device certification. Advisory browser samples are available separately through visual-review. Edition identity and artwork selection require evidence review; neither is certified by automated checks.</footer>
 </main>
 </body></html>"""
     (directory / "report.html").write_text(page)

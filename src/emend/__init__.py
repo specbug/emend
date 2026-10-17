@@ -1,4 +1,4 @@
 """Preservation-first EPUB processing."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 ENGINE_VERSION = "2"
