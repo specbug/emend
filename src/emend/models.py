@@ -37,6 +37,13 @@ class Gate(BaseModel):
     evidence: str | None = None
 
 
+class MetadataChange(BaseModel):
+    field: str
+    before: list[str]
+    after: list[str]
+    evidence_urls: list[str]
+
+
 class Report(BaseModel):
     book_id: str
     source_name: str
@@ -48,3 +55,9 @@ class Report(BaseModel):
     gates: list[Gate]
     artifact_sha256: str | None = None
     changes: list[str] = Field(default_factory=list)
+    metadata_changes: list[MetadataChange] = Field(default_factory=list)
+    research_plan_id: str | None = None
+    research_plan_sha256: str | None = None
+    applied_proposals: list[str] = Field(default_factory=list)
+    parent_artifact_sha256: str | None = None
+    parent_report_path: str | None = None

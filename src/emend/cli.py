@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from typing import Annotated
 
@@ -73,6 +74,10 @@ def doctor(config: ConfigOption = None):
             else "not configured",
             "drive_export": settings.publish.drive_remote or "not configured",
             "drive_backup": settings.publish.backup_remote or "not configured",
+            "meta_model": settings.ai_review.model,
+            "meta_api_key": "configured"
+            if os.environ.get("MODEL_API_KEY")
+            else "not configured (optional)",
             "visual_qa": "not implemented; no device-readiness certification",
         }
         typer.echo(json.dumps(results, indent=2))
@@ -239,6 +244,124 @@ def restore(
         typer.echo(
             f"Restored {restored}\nIn Calibre: Switch/create library → Use the previously existing library at the new location."
         )
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command()
+def research(
+    book_id: str,
+    config: ConfigOption = None,
+    isbn: Annotated[
+        str | None, typer.Option(help="Choose an ISBN already present in the EPUB.")
+    ] = None,
+    offline: bool = False,
+    refresh: bool = False,
+):
+    """Collect exact-ISBN evidence and proposals; never edit or publish a book."""
+    from emend.research.service import plan_text
+    from emend.research.service import research as research_book
+
+    try:
+        result = research_book(
+            book_id, load_config(config), isbn=isbn, offline=offline, refresh=refresh
+        )
+        typer.echo(plan_text(result))
+        if result.provider_errors:
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command()
+def proposals(
+    book_id: str,
+    config: ConfigOption = None,
+    plan: str | None = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Review a recorded research plan, including source evidence and cover suggestions."""
+    from emend.research.service import load_plan, plan_text
+
+    try:
+        store = Store(load_config(config).root)
+        result = load_plan(store, store.resolve(book_id)["id"], plan)
+        typer.echo(result.model_dump_json(indent=2) if as_json else plan_text(result))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("ai-review")
+def ai_review_command(
+    book_id: str,
+    config: ConfigOption = None,
+    plan: str | None = None,
+    show: Annotated[
+        bool, typer.Option(help="Show saved advice without making a network request.")
+    ] = False,
+    refresh: Annotated[
+        bool,
+        typer.Option(
+            help="Request new advice even when cached; may incur another Meta API charge."
+        ),
+    ] = False,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Ask Meta to review collected metadata evidence. Sends metadata, never book content; advice only."""
+    from emend.research.ai_review import review_plan, review_text, show_review
+
+    try:
+        if show and refresh:
+            raise ValueError("--show and --refresh cannot be combined.")
+        settings = load_config(config)
+        result = (
+            show_review(book_id, settings, plan)
+            if show
+            else review_plan(book_id, settings, plan_id=plan, refresh=refresh)
+        )
+        typer.echo(result.model_dump_json(indent=2) if as_json else review_text(result))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("apply")
+def apply_command(
+    book_id: str,
+    config: ConfigOption = None,
+    plan: str | None = None,
+    safe: Annotated[
+        bool, typer.Option(help="Select corroborated missing publisher/date fields.")
+    ] = False,
+    approve: Annotated[
+        list[str] | None,
+        typer.Option(help="Explicitly select a proposal ID; repeat for multiple fields."),
+    ] = None,
+):
+    """Apply selected metadata proposals, preserve resources, and rerun quality gates."""
+    from emend.curation import apply_proposals
+
+    try:
+        typer.echo(
+            report_text(
+                apply_proposals(
+                    book_id, load_config(config), plan_id=plan, safe=safe, approve=approve
+                )
+            )
+        )
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("reset-original")
+def reset_original(book_id: str, config: ConfigOption = None):
+    """Revalidate the preserved original as the active artifact. Keeps history and external copies."""
+    try:
+        settings = load_config(config)
+        identifier = Store(settings.root).resolve(book_id)["id"]
+        result = ingest_book(settings.root / "originals" / f"{identifier}.epub", settings)
+        typer.echo(report_text(result))
+        if result.state != "VALIDATED":
+            raise typer.Exit(1)
     except (ValueError, OSError) as exc:
         fail(exc)
 

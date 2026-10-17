@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -40,12 +41,32 @@ class Publishing(StrictModel):
     backup_remote: str | None = None
 
 
+class MetadataPolicy(StrictModel):
+    sources: list[Literal["openlibrary", "google_books"]] = Field(
+        default_factory=lambda: ["openlibrary", "google_books"], min_length=1
+    )
+    cache_days: int = Field(default=7, ge=1, le=365)
+    request_timeout_seconds: int = Field(default=15, ge=1, le=120)
+
+    def fingerprint(self) -> str:
+        return hashlib.sha256(json.dumps(self.model_dump(), sort_keys=True).encode()).hexdigest()
+
+
+class AIReviewPolicy(StrictModel):
+    model: str = Field(default="muse-spark-1.3", pattern=r"^muse-[a-z0-9.-]+$", max_length=100)
+    reasoning_effort: Literal["low", "medium", "high"] = "medium"
+    max_completion_tokens: int = Field(default=4096, ge=512, le=16384)
+    request_timeout_seconds: int = Field(default=90, ge=1, le=300)
+
+
 class Config(StrictModel):
     root: Path = Field(default_factory=lambda: Path.home() / "Emend")
     quality: Quality = Field(default_factory=Quality)
     limits: Limits = Field(default_factory=Limits)
     tools: ToolPaths = Field(default_factory=ToolPaths)
     publish: Publishing = Field(default_factory=Publishing)
+    metadata: MetadataPolicy = Field(default_factory=MetadataPolicy)
+    ai_review: AIReviewPolicy = Field(default_factory=AIReviewPolicy)
 
     def policy_hash(self) -> str:
         policy = {"quality": self.quality.model_dump(), "limits": self.limits.model_dump()}
