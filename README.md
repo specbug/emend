@@ -109,7 +109,7 @@ Upgrading from 0.1: old reports require revalidation with the new engine (`reset
 
 ## Discover editions when an EPUB has no ISBN
 
-The 0.3 edition/cover features are implemented but have not had runtime or regression testing yet; that validation is deferred to a later development pass. See [the deferred checks](docs/deferred-validation.md).
+The edition/cover workflow passes preservation, rollback, and official EPUBCheck tests, with live Open Library checks. See [validation evidence](docs/validation.md) and [remaining integration checks](docs/deferred-validation.md).
 
 ```sh
 uv run emend discover BOOK_ID
