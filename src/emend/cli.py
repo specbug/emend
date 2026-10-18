@@ -500,16 +500,27 @@ def visual_review_command(
         list[str] | None, typer.Option(help="compact or wide; repeat to select both.")
     ] = None,
     max_documents: Annotated[int, typer.Option(min=1, max=9)] = 5,
+    layout: Annotated[str, typer.Option(help="scroll or paginated; preview only.")] = "scroll",
+    page_margin: Annotated[
+        int, typer.Option(min=16, max=120, help="Paginated preview margin in CSS pixels.")
+    ] = 40,
 ):
     """Capture offline browser samples without changing book approval or publication."""
     from emend.visual import visual_review
 
     try:
         settings = load_config(config)
-        result = visual_review(book_id, settings, profiles=profile, max_documents=max_documents)
+        result = visual_review(
+            book_id,
+            settings,
+            profiles=profile,
+            max_documents=max_documents,
+            layout=layout,
+            page_margin=page_margin,
+        )
         path = Store(settings.root).document(result.book_id, "visual-review", result.id)["path"]
         typer.echo(
-            f"Sampling {result.status}. Review: {result.id}\nOpen: {Path(path).with_suffix('.html')}"
+            f"Sampling {result.status}. Layout: {result.layout}. Review: {result.id}\nOpen: {Path(path).with_suffix('.html')}"
         )
         if result.status == "incomplete":
             raise typer.Exit(1)
@@ -541,7 +552,7 @@ def visuals_command(
         else:
             path = store.document(row["id"], "visual-review", result.id)["path"]
             typer.echo(
-                f"Review {result.id}: {result.status}\nArtifact: {'current' if current else 'STALE; rerun visual-review'}\nOpen: {Path(path).with_suffix('.html')}"
+                f"Review {result.id}: {result.status} ({result.layout})\nArtifact: {'current' if current else 'STALE; rerun visual-review'}\nOpen: {Path(path).with_suffix('.html')}"
             )
         if not current or result.status == "incomplete":
             raise typer.Exit(1)

@@ -1,6 +1,8 @@
 import json
+import os
 import sqlite3
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -100,3 +102,14 @@ shutil.copyfile(args[-2],destination)
 
 
 from tests.test_edition_discovery import search_responses  # noqa: E402, F401
+
+
+@pytest.fixture
+def browser_config(config):
+    pytest.importorskip("playwright.sync_api")
+    browser = os.environ.get("EMEND_TEST_CHROMIUM")
+    if browser:
+        config.tools.chromium = Path(browser)
+    elif not os.environ.get("EMEND_TEST_PLAYWRIGHT"):
+        pytest.skip("Set EMEND_TEST_CHROMIUM or EMEND_TEST_PLAYWRIGHT=1 for browser integration")
+    return config

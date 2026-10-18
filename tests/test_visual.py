@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 import pytest
@@ -15,17 +14,6 @@ from emend.storage import Store
 from emend.visual import load_visual_review, resource_name, select_documents, visual_review
 from tests.epub_factory import book_files, write_epub
 from tests.test_covers import candidate, cover_book
-
-
-@pytest.fixture
-def browser_config(config):
-    pytest.importorskip("playwright.sync_api")
-    browser = os.environ.get("EMEND_TEST_CHROMIUM")
-    if browser:
-        config.tools.chromium = Path(browser)
-    elif not os.environ.get("EMEND_TEST_PLAYWRIGHT"):
-        pytest.skip("Set EMEND_TEST_CHROMIUM or EMEND_TEST_PLAYWRIGHT=1 for browser integration")
-    return config
 
 
 def test_representative_selection_is_bounded_and_includes_ending():

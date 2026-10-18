@@ -4,7 +4,7 @@ The user subsequently authorized testing while travelling. Edition discovery and
 
 Further validation needs real library/device access or a broader corpus:
 
-- Calibrate the new Chromium document samples against actual reader pagination, obfuscated fonts, fixed layouts, vertical writing, and interactive footnotes. The generic browser sizes are not device profiles.
+- Calibrate scrolling and paginated Chromium previews against actual readers, obfuscated fonts, fixed layouts, vertical writing, and interactive footnotes. Paginated mode currently supports only horizontal LTR reflowable content. The generic browser sizes are not device profiles.
 - Open replaced covers in Calibre on the Mac and on the intended reader. Browser comparison does not certify ebook-reader rendering.
 - Exercise more real-world cover declarations, image reuse, unusual colour profiles, palettes/transparency, translated editions, and multi-author collections. Missing/ambiguous/SVG cover declarations remain unsupported for replacement.
 - Verify a successful live Google Books response when quota permits. HTTP 429 is reported as a provider failure, not corroboration.

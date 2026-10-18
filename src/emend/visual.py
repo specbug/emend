@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from emend import ENGINE_VERSION
 from emend.config import Config
 from emend.inspect import NS, inspect_epub, local_target, parse_xml, sha256_file
+from emend.pagination import check_package, page_indices, paginate, validate_layout
 from emend.reports import report_styles
 from emend.research.discovery import current_source
 from emend.storage import Store, now
@@ -36,6 +37,8 @@ class Shot(BaseModel):
     file: str
     sha256: str
     scroll_y: int
+    scroll_x: int = 0
+    page_number: int | None = None
 
 
 class Sample(BaseModel):
@@ -44,6 +47,7 @@ class Sample(BaseModel):
     width: int
     height: int
     document_height: int = 0
+    page_count: int | None = None
     observations: list[str] = Field(default_factory=list)
     screenshots: list[Shot] = Field(default_factory=list)
     error: str | None = None
@@ -57,6 +61,8 @@ class VisualReview(BaseModel):
     engine_version: str
     created_at: str
     browser_version: str
+    layout: Literal["scroll", "paginated"] = "scroll"
+    page_margin: int | None = None
     title: str
     total_spine_documents: int
     selected_documents: list[str]
@@ -129,7 +135,11 @@ def render(
     media: dict[str, str],
     profiles: list[str],
     config: Config,
+    *,
+    layout: str = "scroll",
+    page_margin: int = 40,
 ) -> tuple[str, list[Sample]]:
+    validate_layout(layout, page_margin)
     try:
         from playwright.sync_api import Error as BrowserError
         from playwright.sync_api import sync_playwright
@@ -224,9 +234,13 @@ def render(
                                 raise ValueError(
                                     "Document attempted automatic navigation; sample is incomplete."
                                 )
+                            if layout == "paginated":
+                                pagination = paginate(page, width, height, page_margin)
+                                sample.page_count = pagination["page_count"]
+                                sample.observations.extend(pagination["observations"])
                             metrics = page.evaluate(MEASURE)
                             sample.document_height = metrics["height"]
-                            if metrics["width"] > width + 2:
+                            if layout == "scroll" and metrics["width"] > width + 2:
                                 sample.observations.append(
                                     f"Horizontal overflow: {metrics['width']} CSS px in a {width} px viewport."
                                 )
@@ -250,13 +264,31 @@ def render(
                                     f"Blocked or unavailable resources: {len(blocked)}."
                                 )
                             bottom = max(0, metrics["height"] - height)
-                            for position, y in enumerate(sorted({0, bottom // 2, bottom})):
+                            offsets = (
+                                [
+                                    (number * width, 0, number + 1)
+                                    for number in page_indices(sample.page_count)
+                                ]
+                                if layout == "paginated"
+                                else [(0, y, None) for y in sorted({0, bottom // 2, bottom})]
+                            )
+                            for position, (x, y, page_number) in enumerate(offsets):
                                 if time.monotonic() >= deadline:
                                     raise ValueError("Review time budget exhausted.")
-                                page.evaluate("y => window.scrollTo(0, y)", y)
-                                actual_y = round(page.evaluate("window.scrollY"))
+                                page.evaluate("([x, y]) => window.scrollTo(x, y)", [x, y])
+                                actual_x, actual_y = page.evaluate(
+                                    "[Math.round(window.scrollX), Math.round(window.scrollY)]"
+                                )
+                                if layout == "paginated" and (
+                                    abs(actual_x - x) > 1 or actual_y != 0
+                                ):
+                                    raise ValueError(
+                                        "Browser could not reach the requested page offset; sample is incomplete."
+                                    )
                                 data = page.screenshot(
-                                    type="png", animations="disabled", timeout=10000
+                                    type="png",
+                                    animations="allow" if layout == "paginated" else "disabled",
+                                    timeout=10000,
                                 )
                                 if navigation["rejected"] or resource_name(page.url) != document:
                                     raise ValueError(
@@ -269,7 +301,11 @@ def render(
                                 path.write_bytes(data)
                                 sample.screenshots.append(
                                     Shot(
-                                        file=path.name, sha256=sha256_file(path), scroll_y=actual_y
+                                        file=path.name,
+                                        sha256=sha256_file(path),
+                                        scroll_y=actual_y,
+                                        scroll_x=actual_x,
+                                        page_number=page_number,
                                     )
                                 )
                         except (BrowserError, ValueError) as exc:
@@ -289,8 +325,15 @@ def render(
 
 
 def visual_review(
-    book_id: str, config: Config, *, profiles: list[str] | None = None, max_documents: int = 5
+    book_id: str,
+    config: Config,
+    *,
+    profiles: list[str] | None = None,
+    max_documents: int = 5,
+    layout: str = "scroll",
+    page_margin: int = 40,
 ) -> VisualReview:
+    validate_layout(layout, page_margin)
     profiles = profiles if profiles is not None else list(PROFILES)
     if (
         not profiles
@@ -314,6 +357,8 @@ def visual_review(
             media, nav = {}, []
             with zipfile.ZipFile(snapshot) as archive:
                 package = parse_xml(archive.read(inspection.package_path))
+                if layout == "paginated":
+                    check_package(package)
                 for item in package.xpath("opf:manifest/opf:item", namespaces=NS):
                     target = local_target(inspection.package_path, item.get("href", ""))
                     if target:
@@ -328,7 +373,16 @@ def visual_review(
             directory = config.root / "visual" / row["id"] / identifier
             directory.mkdir(parents=True)
             try:
-                version, samples = render(snapshot, directory, selected, media, profiles, config)
+                version, samples = render(
+                    snapshot,
+                    directory,
+                    selected,
+                    media,
+                    profiles,
+                    config,
+                    layout=layout,
+                    page_margin=page_margin,
+                )
                 _, _, latest = current_source(store, row["id"], config)
                 if latest != digest:
                     raise ValueError("Artifact changed during visual review.")
@@ -339,6 +393,8 @@ def visual_review(
                     engine_version=ENGINE_VERSION,
                     created_at=now(),
                     browser_version=version,
+                    layout=layout,
+                    page_margin=page_margin if layout == "paginated" else None,
                     title="; ".join(inspection.metadata.get("title", [])),
                     total_spine_documents=len(inspection.spine),
                     selected_documents=selected,
@@ -346,6 +402,16 @@ def visual_review(
                     status="incomplete" if any(s.error for s in samples) else "complete",
                     samples=samples,
                 )
+                if layout == "paginated":
+                    result.notes[1] = (
+                        f"Chromium column pagination with {page_margin} CSS px page margins. Preview geometry and forced page breaks are adapted; EPUB bytes and publisher font/text styles stay unchanged."
+                    )
+                    result.notes[3] = (
+                        "First, middle, and last pages of each selected document are sampled. Page numbers restart per document and are not book-wide reader locations."
+                    )
+                    result.notes.append(
+                        "Horizontal LTR reflowable documents only. Fixed layouts, RTL/vertical flow, column spanners, and left/right page parity need another reader."
+                    )
                 path = directory / "review.json"
                 path.write_text(result.model_dump_json(indent=2))
                 write_html(result, directory)
@@ -381,21 +447,31 @@ def write_html(review: VisualReview, directory: Path):
         figures = []
         for shot in sample.screenshots:
             data = base64.b64encode((directory / shot.file).read_bytes()).decode()
-            label = f"{sample.document}, {sample.profile}, vertical offset {shot.scroll_y} px"
+            position = (
+                f"Page {shot.page_number} of {sample.page_count}"
+                if shot.page_number is not None
+                else f"Offset {shot.scroll_y} px"
+            )
+            label = f"{sample.document}, {sample.profile}, {position}"
             figures.append(
-                f'<figure><img src="data:image/png;base64,{data}" width="{sample.width}" height="{sample.height}" alt="{esc(label)}" loading="lazy"><figcaption>Offset {shot.scroll_y} px · {sample.width} × {sample.height}</figcaption></figure>'
+                f'<figure><img src="data:image/png;base64,{data}" width="{sample.width}" height="{sample.height}" alt="{esc(label)}" loading="lazy"><figcaption>{esc(position)} · {sample.width} × {sample.height}</figcaption></figure>'
             )
         notes = [*sample.observations, *([sample.error] if sample.error else [])]
         if not notes:
             notes = ["No geometry warnings detected in this sample. Review the screenshots."]
+        extent = (
+            f"{sample.page_count} {'page' if sample.page_count == 1 else 'pages'} in document"
+            if sample.page_count
+            else f"document height {sample.document_height:,} px"
+        )
         sections.append(
-            f'<section><h2>{esc(sample.document)}</h2><p>{esc(sample.profile.title())} · document height {sample.document_height:,} px</p><ul>{"".join(f"<li>{esc(n)}</li>" for n in notes)}</ul><div class="shots">{"".join(figures)}</div></section>'
+            f'<section><h2>{esc(sample.document)}</h2><p>{esc(sample.profile.title())} · {esc(extent)}</p><ul>{"".join(f"<li>{esc(n)}</li>" for n in notes)}</ul><div class="shots">{"".join(figures)}</div></section>'
         )
     (
         directory / "review.html"
     ).write_text(f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"><title>Emend visual review</title><style>{report_styles()}
 .shots {{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr));gap:1.5rem;margin-top:1.5rem}}
-figure {{margin:0;min-width:0}} figure img {{display:block;width:100%;height:auto;border:1px solid var(--rule)}}
+figure {{margin:0;min-width:0}} figure img {{display:block;width:auto;max-width:100%;height:auto;border:1px solid var(--rule)}}
 figcaption {{font-family:var(--mono);font-size:.75rem;margin-top:.5rem;color:var(--muted)}}
 section {{border-bottom:1px solid var(--rule);padding-bottom:2rem}} h2 {{overflow-wrap:anywhere}}
-</style></head><body><main><header><div class="brand">EMEND / VISUAL REVIEW</div><h1>{esc(review.title)}</h1><p>Sampling {esc(review.status)} · {len(review.selected_documents)} selected documents · {review.total_spine_documents} spine documents in book</p><p>Review layout, spacing, illustrations, and reading comfort at the recorded viewport sizes.</p><code>Artifact {review.artifact_sha256}</code></header><h2>Scope of this review</h2><ul>{"".join(f"<li>{esc(n)}</li>" for n in review.notes)}</ul>{"".join(sections)}<footer>Generated {esc(review.created_at)} using Chromium {esc(review.browser_version)}. Screenshots belong to the recorded artifact; a later edit requires a new review. Browser rendering is not device certification.</footer></main></body></html>""")
+</style></head><body><main><header><div class="brand">EMEND / VISUAL REVIEW</div><h1>{esc(review.title)}</h1><p>Sampling {esc(review.status)} · {esc(review.layout.title())} layout · {len(review.selected_documents)} selected documents · {review.total_spine_documents} spine documents in book</p><p>Review layout, spacing, illustrations, and reading comfort at the recorded viewport sizes.</p><code>Artifact {review.artifact_sha256}</code></header><h2>Scope of this review</h2><ul>{"".join(f"<li>{esc(n)}</li>" for n in review.notes)}</ul>{"".join(sections)}<footer>Generated {esc(review.created_at)} using Chromium {esc(review.browser_version)}. Screenshots belong to the recorded artifact; a later edit requires a new review. Browser rendering is not device certification.</footer></main></body></html>""")
