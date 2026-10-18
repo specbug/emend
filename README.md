@@ -26,6 +26,23 @@ brew install epubcheck
 
 Alternatively, download an official [EPUBCheck release](https://github.com/w3c/epubcheck/releases), install its required Java runtime, and set `tools.epubcheck_jar` to the extracted `epubcheck.jar`. Preserve the distribution's dependency folder alongside the JAR. Optional accessibility checks use [Ace by DAISY](https://daisy.github.io/ace/).
 
+### Accessibility findings
+
+With Node.js 22 or newer installed, install the standalone DAISY CLI:
+
+```sh
+npm install -g @daisy/ace-cli@1.4.6
+command -v ace-cli
+```
+
+Set `tools.ace` to the absolute executable path printed above. An existing `ace` executable on `PATH` also works. The CLI installation includes its Puppeteer browser; this is separate from Emend's optional Playwright visual renderer. `scripts/setup-ace.sh` installs the pinned CLI in `EMEND_ACE_DIR` for integration testing.
+
+On the next ingestion or explicit metadata/cover application, Ace findings appear in the quality report's HTML, text, and JSON: rule, impact, document, and CSS selectors when supplied by Ace. Reports record the Ace version and raw JSON fingerprint. The original Ace report remains beside the quality report under `ace/report.json`; document/report summaries are not counted again as separate violations. A required audit blocks publication on violations, unresolved outcomes, malformed evidence, or a failed process. An optional failed audit stays visible in the library overview without blocking publication.
+
+Set `quality.require_accessibility_audit: true` to require the audit. Existing reports remain readable and do not gain findings retroactively. Do not re-ingest an original just to refresh these findings if you want to retain its curated edits: ingestion resets that book to the original. A clean automated audit still needs manual screen-reader, reading-order, image-description, navigation/footnote, contrast, and resizing review. Emend does not add accessibility conformance metadata or rewrite the book.
+
+Emend reads at most 32 MiB of Ace JSON, rejects malformed or excessively nested assertion trees, and retains at most 500 finding details with bounded text/selectors. Counts include the entire parsed audit; shortened summaries are labelled and full evidence remains in the raw report. These bounds apply to Emend's parser, not Ace's own output generation.
+
 Edit `~/Emend/config.yaml`:
 
 ```yaml

@@ -115,6 +115,9 @@ def summarize_book(row: dict, records: list[tuple[str, dict]], config: Config) -
             book.issues.append("Quality policy or engine changed; revalidation is needed.")
         if row["state"] != "VALIDATED":
             book.issues.append("Required publication checks have not passed.")
+        for gate in report.gates:
+            if gate.name == "accessibility" and gate.status == "failed":
+                book.issues.append(f"Accessibility audit needs attention: {gate.detail}")
         if row["artifact_path"]:
             local_file(config.root, row["artifact_path"])
         quality_href = link(config.root, Path(row["report_path"]).with_suffix(".html")) or link(

@@ -39,6 +39,7 @@ h1 {
   overflow-wrap: anywhere;
 }
 h2 { margin: 3rem 0 1rem; font-size: 1.25rem; line-height: 1.25; font-weight: 500; }
+h3 { margin: 2rem 0 1rem; font-size: 1rem; line-height: 1.5; font-weight: 500; }
 p { margin: 0 0 1rem; max-width: 68ch; }
 code { font-family: var(--mono); overflow-wrap: anywhere; font-size: 0.8rem; line-height: 1.6; }
 .state {
