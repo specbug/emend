@@ -17,7 +17,7 @@ Exact-ISBN Open Library/Google Books research, cached responses, retained eviden
 
 ## Implemented: optional Meta-assisted review
 
-`ai-review` uses [Meta Model API](https://dev.meta.ai/products/meta-model-api), with Muse Spark 1.3 Standard mode by default. It reviews only collected metadata evidence, cites existing proposal/record IDs, saves bounded structured advice with request provenance, and never promotes proposals to safe or applies them. Cached reviews avoid repeated calls; explicit refresh and retries remain user-controlled. The documented API contract and failure handling are tested; authenticated generation awaits `MODEL_API_KEY`.
+`ai-review` uses [Meta Model API](https://dev.meta.ai/products/meta-model-api), with Muse Spark 1.3 Standard mode by default. It reviews only collected metadata evidence, cites existing proposal/record IDs, saves bounded structured advice with request provenance, and never promotes proposals to safe or applies them. Cached reviews avoid repeated calls; explicit refresh and retries remain user-controlled. The documented API contract and failure handling are tested. Authenticated generation passed a synthetic-evidence smoke test on 2026-10-18, including structured citation validation and cache reuse; broader real-edition evaluation remains future work.
 
 ## Delivered: edition discovery and cover review
 

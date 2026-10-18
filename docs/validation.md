@@ -56,6 +56,14 @@ uv run ruff format --check .
 
 For another machine, use its actual EPUBCheck JAR path. Without `EMEND_TEST_EPUBCHECK_JAR`, the official-validator integration cases are explicitly skipped. The remaining validator subprocess tests use fixtures and are not substitutes for the official integration.
 
+## Authenticated Meta smoke test — 2026-10-18
+
+The configured `MODEL_API_KEY` was reported ready and used through the inherited HTTPS proxy with the existing production client. One request to `muse-spark-1.3` reviewed an ambiguous publisher proposal for an original synthetic EPUB and fixture edition records. No personal book text or files were uploaded, and no credential value was printed or saved.
+
+The live response passed strict structured-output parsing, proposal coverage, and source-citation checks. It produced one recommendation and reported 1,269 prompt tokens plus 1,629 completion tokens (2,898 total). The EPUB artifact hash, quality report, and book approval state remained unchanged. A repeated review reused the registered result with the network-call function replaced by a failing guard; reading saved advice also returned the identical result.
+
+This establishes the authenticated API path and cache behavior, not the factual reliability of advice across real editions. The automated failure-mode tests remain fixture-based. No source-code adjustment was needed for the live API response.
+
 ## Remaining integration checks
 
 - The target Mac mini M4 was not accessible. Calibre's macOS executable detection and command arguments are implemented; the argument/JSON formats were cross-checked against upstream Calibre source. A real Calibre import and opening a restored library still need verification on the Mac.
@@ -63,7 +71,7 @@ For another machine, use its actual EPUBCheck JAR path. Without `EMEND_TEST_EPUB
 - Ace is optional and was tested with structured subprocess fixtures, not a real browser accessibility audit. Reports show it as unavailable when it is absent.
 - The foundation and initial metadata-curation commits passed hosted macOS and Linux CI. Meta review checks are tracked on PR #2.
 - On 2026-10-17, live Open Library parsing resolved ISBN 9780140328721 to edition OL7353617M (*Fantastic Mr. Fox*), author Roald Dahl, publisher/date/language, and cover provenance, retaining two evidence documents. Google Books was reachable but returned HTTP 429; a successful live Google response remains unverified.
-- Meta documentation was read successfully on 2026-10-17: [Chat Completions](https://dev.meta.ai/docs/protocols/chat-completions), [structured output](https://dev.meta.ai/docs/structured-output), and [authentication](https://dev.meta.ai/docs/authentication). The configured client uses `https://api.meta.ai/v1/chat/completions` and `MODEL_API_KEY`. No key was available for authenticated generation; its secret requirement and `api.meta.ai` destination were saved for secure entry.
+- Meta documentation was read successfully on 2026-10-17: [Chat Completions](https://dev.meta.ai/docs/protocols/chat-completions), [structured output](https://dev.meta.ai/docs/structured-output), and [authentication](https://dev.meta.ai/docs/authentication). The configured client uses `https://api.meta.ai/v1/chat/completions` and `MODEL_API_KEY`. The key was initially unavailable; the authenticated smoke test above subsequently passed on 2026-10-18.
 - Paginated reader emulation, general structural repair, and XTEINK transfer remain deferred. No device compatibility or publication-quality certification is claimed.
 
 ## Report presentation

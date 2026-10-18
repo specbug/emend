@@ -218,7 +218,7 @@ ai_review:
   request_timeout_seconds: 90
 ```
 
-The client has been tested against the documented contract using local response fixtures. Authenticated live generation still needs a configured Meta API key. Source providers can also be quota-limited: Google Books currently returns HTTP 429 from the development environment. Missing corroboration remains visible and prevents safe proposals.
+The client has contract/failure tests using local response fixtures and passed an authenticated Muse Spark 1.3 smoke test on 2026-10-18 using synthetic edition metadata. Structured advice and citations validated; book bytes and approval state stayed unchanged, and a repeat review reused the cache without another API call. Source providers can also be quota-limited: Google Books currently returns HTTP 429 from the development environment. Missing corroboration remains visible and prevents safe proposals.
 
 ## Publish approved books to Calibre
 
