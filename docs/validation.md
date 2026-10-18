@@ -56,6 +56,14 @@ uv run ruff format --check .
 
 For another machine, use its actual EPUBCheck JAR path. Without `EMEND_TEST_EPUBCHECK_JAR`, the official-validator integration cases are explicitly skipped. The remaining validator subprocess tests use fixtures and are not substitutes for the official integration.
 
+## Paginated browser preview (0.5)
+
+The full suite passes **209 tests**, with official EPUBCheck and real Chromium enabled. The 22 new pagination cases cover numbered EPUB 2/3 captures, unchanged source/artifact/report state, first/middle/final page selection, final-text reachability, retained authored typography, forced breaks, custom margins, oversized content and text-edge warnings, animation freezing, unsupported layouts, bounded page counts, CLI output, and older scrolling-review compatibility.
+
+An original synthetic chapter produced 15 compact pages and 5 wide pages, with first/middle/final screenshots labelled at their exact offsets. The final page was visually inspected, and contact sheets were rendered at 1280 px and 390 px with no horizontal overflow. Lint, formatting, and source/wheel builds pass. The installed wheel includes the tested pagination script and renders a two-page example using real Chromium.
+
+The test corpus establishes the controlled browser behavior, not matching page counts in Calibre, Apple Books, or XTEINK. This first paginated mode supports horizontal LTR reflowable content only. Page counts are per document; left/right blank-page parity and interactive footnote placement remain outside its scope.
+
 ## Authenticated Meta smoke test — 2026-10-18
 
 The configured `MODEL_API_KEY` was reported ready and used through the inherited HTTPS proxy with the existing production client. One request to `muse-spark-1.3` reviewed an ambiguous publisher proposal for an original synthetic EPUB and fixture edition records. No personal book text or files were uploaded, and no credential value was printed or saved.
@@ -72,7 +80,7 @@ This establishes the authenticated API path and cache behavior, not the factual 
 - The foundation and initial metadata-curation commits passed hosted macOS and Linux CI. Meta review checks are tracked on PR #2.
 - On 2026-10-17, live Open Library parsing resolved ISBN 9780140328721 to edition OL7353617M (*Fantastic Mr. Fox*), author Roald Dahl, publisher/date/language, and cover provenance, retaining two evidence documents. Google Books was reachable but returned HTTP 429; a successful live Google response remains unverified.
 - Meta documentation was read successfully on 2026-10-17: [Chat Completions](https://dev.meta.ai/docs/protocols/chat-completions), [structured output](https://dev.meta.ai/docs/structured-output), and [authentication](https://dev.meta.ai/docs/authentication). The configured client uses `https://api.meta.ai/v1/chat/completions` and `MODEL_API_KEY`. The key was initially unavailable; the authenticated smoke test above subsequently passed on 2026-10-18.
-- Paginated reader emulation, general structural repair, and XTEINK transfer remain deferred. No device compatibility or publication-quality certification is claimed.
+- Device-specific reader emulation, general structural repair, and XTEINK transfer remain deferred. No device compatibility or publication-quality certification is claimed.
 
 ## Report presentation
 

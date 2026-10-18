@@ -29,15 +29,19 @@ The complete 157-test suite, including official EPUBCheck integration, passes lo
 
 ## Implemented: offline visual document review
 
-Version 0.4 adds optional Playwright/Chromium sampling of representative spine/navigation documents, compact/wide viewports, bounded vertical screenshots, geometry observations, and self-contained reports tied to an artifact hash. Scripts and network access are disabled, publisher resources remain unchanged, and no approval state is promoted. These are scrolling browser documents; EPUB pagination and device emulation remain future work.
+Version 0.4 adds optional Playwright/Chromium sampling of representative spine/navigation documents, compact/wide viewports, bounded vertical screenshots, geometry observations, and self-contained reports tied to an artifact hash. Scripts and network access are disabled, publisher resources remain unchanged, and no approval state is promoted. The default remains scrolling browser documents; version 0.5 adds opt-in page previews below.
 
 ## Implemented: local library overview
 
 `library` builds a local HTML/JSON index of recorded book states and the latest review evidence, with bounded pages for larger libraries. It shows stale/incomplete/unavailable records, applied metadata/cover history, pending proposals, and inspection commands. It reads existing evidence without provider calls, browser installation, editing, or publishing.
 
-## Next: pagination and accessibility depth
+## Implemented: paginated browser preview
 
-Add a paginated EPUB renderer and calibrate it against real reader screenshots. Validate the Ace integration against real books, extend font/footnote/layout coverage, and add optional multimodal advice. Actual Apple Books and XTEINK checks remain necessary before making device claims.
+Version 0.5 adds `visual-review --layout paginated` for horizontal LTR reflowable books. Chromium columns provide numbered first/middle/last-page samples with recorded reader margins. Preview-only geometry and break adaptation leave EPUB bytes and publisher text/font styling intact. Unsupported fixed/RTL/vertical layouts are explicit; oversized content, text-edge spillover, and positioned elements produce observations. Existing scrolling reviews remain supported.
+
+## Next: reader calibration and accessibility depth
+
+Calibrate browser pagination against real reader screenshots, extend supported writing/layout modes, and verify footnote behavior. Validate the Ace integration against real books, extend font/footnote/layout coverage, and add optional multimodal advice. Actual Apple Books and XTEINK checks remain necessary before making device claims.
 
 ## Later: device delivery and automation
 

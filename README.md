@@ -178,11 +178,24 @@ uv run emend visuals BOOK_ID --json
 
 Open the reported `review.html` file for a self-contained screenshot contact sheet. The default samples up to five documents, prioritizing the beginning, middle, and end of the spine, then navigation and additional positions. Each document is captured at **600 × 800** and **1000 × 1400** CSS pixels, with up to three vertical offsets. Select fewer samples with `--profile compact --max-documents 3`; repeat `--profile` to choose both sizes. PNGs and hash-registered JSON live under `~/Emend/visual/BOOK_ID/REVIEW_ID/`.
 
+For numbered page previews of horizontal, left-to-right, reflowable books:
+
+```sh
+uv run --extra visual emend visual-review BOOK_ID --layout paginated
+uv run --extra visual emend visual-review BOOK_ID --layout paginated --page-margin 48 --profile compact
+```
+
+Paginated mode uses Chromium's CSS columns to sample the first, middle, and last page of each selected document. Page numbers restart per document; they are not book-wide locations. `--page-margin` accepts 16–120 CSS pixels (default 40), and the report records the margin, page count, and exact horizontal capture offsets. The default `--layout scroll` keeps the existing vertical-sampling workflow; older saved reviews remain readable.
+
+Only the preview DOM gets reader geometry overrides: page width/height, margins, columns, and forced page-break adaptation. Animations are paused at their initial frame before measuring pages. Publisher text and font styling are retained, and no EPUB bytes are changed. Reports flag oversized images/tables, text crossing page margins, vertical spillover, and positioned elements. Fixed-layout declarations and right-to-left page progression are rejected before launching the browser; vertical/RTL document flow and column spanners produce an explicit incomplete review. These cases remain available in scrolling mode.
+
+Pagination is capped at 5,000 pages and 20,000 elements per document, with text-edge inspection limited to 50,000 fragment rectangles. The existing screenshot and time budgets still apply. Left/right blank-page parity, interactive footnote placement, and full-book pagination are not emulated.
+
 The renderer uses the EPUB's own XHTML, CSS, images, and fonts from a temporary verified copy. No EPUB changes or uploads occur. A browser context with networking and JavaScript disabled serves only manifest resources from the archive through intercepted requests. Nothing is extracted into a web server. If Chromium is already installed, set `tools.chromium` to its executable path instead of downloading Playwright's browser. `doctor` reports optional renderer availability; actual launch is checked by `visual-review`.
 
 Review hints identify horizontal overflow, failed HTML images/font faces, and visible text elements below 10 CSS pixels. Resource reads are capped at 8 MiB each, screenshots at 48 MiB per review, and sampling stops after the configured tool-time budget (at most 180 seconds, plus any in-flight browser operation). Missing browsers fail explicitly; interrupted captures are saved as **incomplete**, and the command exits nonzero. Warnings in a completed capture are advisory and do not alter publication state. `visuals` verifies report/screenshot hashes and exits nonzero if the book has changed since capture.
 
-These are scrolling Chromium documents, not paginated ebook-reader previews. Compact/wide profiles do not emulate the X4 Pro or Apple Books. Obfuscated fonts, fixed layouts, vertical text, footnote interactions, and unsampled content need reader review. Browser/OS font differences can affect pixels; the report records Chromium's version and viewport sizes. Visual review remains separate from required EPUBCheck and accessibility gates.
+Both layouts are generic Chromium previews. Compact/wide profiles do not emulate the X4 Pro or Apple Books. Obfuscated fonts, fixed layouts, vertical text, footnote interactions, and unsampled content need reader review. Browser/OS font differences can affect pixels; the report records Chromium's version and viewport sizes. Visual review remains separate from required EPUBCheck and accessibility gates.
 
 ## Ask Meta to review uncertain metadata
 

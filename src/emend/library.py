@@ -202,7 +202,7 @@ def summarize_book(row: dict, records: list[tuple[str, dict]], config: Config) -
                 current_visual = status == "current" and record.status == "complete"
                 if status == "current" and record.status == "incomplete":
                     status = "incomplete"
-                detail = f"{len(record.samples)} browser samples · capture {record.status}"
+                detail = f"{len(record.samples)} browser samples · {record.layout} · capture {record.status}"
             elif kind == "ai-review":
                 if (
                     not latest_plan
