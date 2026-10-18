@@ -2,6 +2,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from emend.accessibility import read_ace_report
 from emend.config import Config, executable
 from emend.models import Gate
 
@@ -88,44 +89,23 @@ def validate_ace(epub: Path, directory: Path, config: Config) -> Gate:
     out = directory / "ace"
     log = directory / "ace.log"
     try:
+        if out.exists():
+            raise ValueError("Ace output already exists; use a fresh validation directory")
         result = run_tool(
             [tool, "--outdir", str(out), str(epub.resolve())],
             config.limits.tool_timeout_seconds,
             log,
         )
         report_path = out / "report.json"
-        report = json.loads(report_path.read_text())
-        if (
-            not isinstance(report, dict)
-            or "assertions" not in report
-            or not isinstance(report["assertions"], list)
-        ):
-            raise ValueError("Missing Ace assertions")
-        outcomes = []
-
-        def walk(value):
-            if isinstance(value, dict):
-                if "earl:outcome" in value:
-                    outcomes.append(value["earl:outcome"])
-                for child in value.values():
-                    walk(child)
-            elif isinstance(value, list):
-                for child in value:
-                    walk(child)
-
-        walk(report)
-        if not outcomes:
-            raise ValueError("Ace report contains no audit outcomes")
-        passed = result.returncode == 0 and all(
-            outcome in {"pass", "passed", "earl:passed", "inapplicable", "earl:inapplicable"}
-            for outcome in outcomes
-        )
+        audit = read_ace_report(report_path)
+        passed = result.returncode == 0 and audit.outcome == "passed"
         return Gate(
             name="accessibility",
             status="passed" if passed else "failed",
             required=required,
-            detail=f"Exit {result.returncode}; {len(outcomes)} audit outcomes. Manual accessibility checks remain outside this audit.",
+            detail=f"Exit {result.returncode}; {audit.failed} violations, {audit.incomplete} unresolved outcomes. Automated checks only; manual accessibility review remains required.",
             evidence=str(report_path),
+            accessibility=audit,
         )
     except (ValueError, OSError, TypeError) as exc:
         return Gate(

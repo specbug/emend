@@ -29,12 +29,32 @@ class Inspection(BaseModel):
         return any(item.severity == "error" for item in self.findings)
 
 
+class AccessibilityFinding(BaseModel):
+    rule: str
+    outcome: Literal["failed", "incomplete"]
+    impact: str | None = None
+    message: str
+    document: str | None = None
+    selectors: list[str] = Field(default_factory=list)
+
+
+class AccessibilityAudit(BaseModel):
+    tool_version: str | None = None
+    report_sha256: str
+    outcome: Literal["passed", "failed", "incomplete"]
+    failed: int = 0
+    incomplete: int = 0
+    findings: list[AccessibilityFinding] = Field(default_factory=list)
+    truncated: bool = False
+
+
 class Gate(BaseModel):
     name: str
     status: Literal["passed", "failed", "unavailable", "skipped"]
     required: bool
     detail: str
     evidence: str | None = None
+    accessibility: AccessibilityAudit | None = None
 
 
 class MetadataChange(BaseModel):

@@ -41,7 +41,9 @@ Version 0.5 adds `visual-review --layout paginated` for horizontal LTR reflowabl
 
 ## Next: reader calibration and accessibility depth
 
-Calibrate browser pagination against real reader screenshots, extend supported writing/layout modes, and verify footnote behavior. Validate the Ace integration against real books, extend font/footnote/layout coverage, and add optional multimodal advice. Actual Apple Books and XTEINK checks remain necessary before making device claims.
+Version 0.6 adds structured Ace rule findings to quality reports, raw-evidence fingerprints, conservative handling of incomplete/malformed results, and optional-audit warnings in the library overview. Hosted integration tests exercise DAISY Ace 1.4.6 on original EPUB 2/3 fixtures. Automated audits remain separate from manual conformance review.
+
+Calibrate browser pagination against real reader screenshots, extend supported writing/layout modes, and verify footnote behavior. Broaden accessibility testing to a real-book corpus and screen readers, extend font/footnote/layout coverage, and add optional multimodal advice. Actual Apple Books and XTEINK checks remain necessary before making device claims.
 
 ## Later: device delivery and automation
 

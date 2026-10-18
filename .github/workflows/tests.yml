@@ -15,6 +15,9 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Install and verify tools
         env:
           UV_CACHE_DIR: ${{ runner.temp }}/uv-cache
@@ -22,9 +25,16 @@ jobs:
         run: bash scripts/setup-cloud.sh
       - name: Install optional visual renderer and Chromium
         run: uv sync --frozen --extra visual && uv run --extra visual playwright install --with-deps chromium
+      - name: Install official Ace CLI
+        env:
+          EMEND_ACE_DIR: ${{ runner.temp }}/emend-ace
+          PUPPETEER_CACHE_DIR: ${{ runner.temp }}/puppeteer
+        run: bash scripts/setup-ace.sh
       - run: uv run --extra visual ruff check . && uv run --extra visual ruff format --check .
       - name: Run regression tests and official EPUBCheck integration
         env:
           EMEND_TEST_EPUBCHECK_JAR: ${{ runner.temp }}/emend-tools/epubcheck-5.3.0/epubcheck.jar
           EMEND_TEST_PLAYWRIGHT: "1"
+          EMEND_TEST_ACE: ${{ runner.temp }}/emend-ace/node_modules/.bin/ace-cli
+          PUPPETEER_CACHE_DIR: ${{ runner.temp }}/puppeteer
         run: uv run --extra visual pytest -q

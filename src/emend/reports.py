@@ -45,6 +45,21 @@ def report_text(report: Report) -> str:
         lines.append(
             f"{gate.name}: {gate.status} ({'required' if gate.required else 'optional'}) — {gate.detail}"
         )
+        if audit := gate.accessibility:
+            lines.append(
+                f"  Ace {audit.tool_version or '(version not reported)'} · SHA-256 {audit.report_sha256}"
+            )
+            for finding in audit.findings:
+                location = " · ".join(filter(None, [finding.document, *finding.selectors]))
+                lines.append(
+                    f"  {finding.outcome.upper()} {finding.rule} ({finding.impact or 'impact unspecified'}): {finding.message}"
+                )
+                if location:
+                    lines.append(f"    {location}")
+            if audit.truncated:
+                lines.append(
+                    "  Findings or long details shortened; full evidence is in the saved Ace JSON."
+                )
     lines.append("")
     for finding in report.inspection.findings:
         lines.append(
@@ -52,6 +67,42 @@ def report_text(report: Report) -> str:
             + (f" [{finding.location}]" if finding.location else "")
         )
     return "\n".join(lines)
+
+
+def accessibility_html(report: Report) -> str:
+    gate = next((g for g in report.gates if g.name == "accessibility"), None)
+    if gate is None or gate.accessibility is None:
+        return ""
+    audit = gate.accessibility
+    esc = html.escape
+    findings = []
+    for finding in audit.findings:
+        location = " · ".join(filter(None, [finding.document, *finding.selectors]))
+        findings.append(
+            f"<li><strong>{esc(finding.outcome.upper())} · {esc(finding.rule)} · {esc(finding.impact or 'impact unspecified')}</strong>"
+            f"<p>{esc(finding.message)}</p><code>{esc(location)}</code></li>"
+        )
+    summary = (
+        f"{audit.failed} violations · {audit.incomplete} unresolved outcomes. "
+        "Parent/document summaries are not counted again as separate violations."
+    )
+    if audit.truncated:
+        summary += (
+            " Findings or long details shortened; consult the saved Ace JSON for full evidence."
+        )
+    items = (
+        "".join(findings)
+        or "<li>No rule-level findings recorded. Check the audit's process status above.</li>"
+    )
+    return (
+        f'<section aria-labelledby="accessibility-heading"><h2 id="accessibility-heading">Accessibility findings</h2>'
+        f"<p>{esc(summary)}</p><p>Ace {esc(audit.tool_version or '(version not reported)')}</p><ul>{items}</ul>"
+        f"<p>Raw Ace JSON SHA-256: <code>{esc(audit.report_sha256)}</code></p>"
+        "<h3>Manual review still needed</h3>"
+        "<p>Read in a screen reader and check reading order, heading/navigation usefulness, "
+        "image-description accuracy, and footnote links and return paths. Check contrast and "
+        "text resizing in the intended reader. Automated results do not establish accessibility conformance.</p></section>"
+    )
 
 
 def write_reports(report: Report, directory: Path) -> Path:
@@ -124,6 +175,7 @@ def write_reports(report: Report, directory: Path) -> Path:
 <header><div class="brand">EMEND / QUALITY REPORT</div><h1>{esc(title)}</h1><p class="state">{report.state}</p>
 <p>Original preserved · {"Curated changes recorded" if report.changes else "No editorial changes"}</p><code>{report.book_id}</code></header>
 <h2>Publication gates</h2><table><thead><tr><th>Check</th><th>Result</th><th>Policy</th><th>Evidence summary</th></tr></thead><tbody>{gates}</tbody></table>
+{accessibility_html(report)}
 <h2>Metadata changes</h2><ul>{changes}</ul>
 {cover_section}
 <h2>Inspection findings</h2><ul>{findings}</ul>
