@@ -72,11 +72,21 @@ The live response passed strict structured-output parsing, proposal coverage, an
 
 This establishes the authenticated API path and cache behavior, not the factual reliability of advice across real editions. The automated failure-mode tests remain fixture-based. No source-code adjustment was needed for the live API response.
 
+## Actionable accessibility findings (0.6)
+
+The suite now contains **244 tests**. The local run passes **241**, including official EPUBCheck and real Chromium, with the three full Ace CLI cases explicitly skipped. Parser/process tests cover DAISY's nested EARL schema, report fingerprints, inherited document paths and CSS selectors, summary deduplication, unresolved and contradictory outcomes, malformed reports, bounded evidence, nonzero exits, stale output refusal, optional/required publication policy, escaped HTML, older report compatibility, and library visibility.
+
+Hosted macOS/Linux CI installs the official `@daisy/ace-cli@1.4.6` with its Puppeteer browser. Integration cases exercise a clean original EPUB 3 with accessibility metadata, and deliberate missing-alt defects in EPUB 2 and EPUB 3. The defect cases verify the `image-alt` rule, document/selector locations, preserved bytes, blocked required gates, and removal of that finding when the fixture's alt text is restored. The clean fixture also runs through official EPUBCheck. These are original synthetic books, not a representative publisher corpus or screen-reader evaluation.
+
+The managed cloud Chromium rejects Ace's required `file:` navigation with `ERR_BLOCKED_BY_ADMINISTRATOR`; this is not treated as a passing audit. Local diagnosis used Ace's published axe rules on the same XHTML served by an in-memory browser route. It caught a missing `doc-toc` role in the clean fixture; the corrected documents pass those rules and official EPUBCheck. Full command-line integration runs in the hosted workflow with the unmodified DAISY runner.
+
+The quality report was rendered and visually checked at 1280 px and 390 px with no horizontal overflow. Lint, formatting, wheel/sdist builds, and the optional CLI installation script pass. Emend's report runs no scripts or network requests; the separate raw DAISY report is retained as tool evidence.
+
 ## Remaining integration checks
 
 - The target Mac mini M4 was not accessible. Calibre's macOS executable detection and command arguments are implemented; the argument/JSON formats were cross-checked against upstream Calibre source. A real Calibre import and opening a restored library still need verification on the Mac.
 - No personal Google Drive account was connected or uploaded to. rclone upload behavior is tested at the process boundary; the user must configure and verify the actual remote locally.
-- Ace is optional and was tested with structured subprocess fixtures, not a real browser accessibility audit. Reports show it as unavailable when it is absent.
+- Ace is optional. Structured parser/process fixtures and hosted official-CLI checks are described above; broader real-book and manual screen-reader validation remains outstanding. Reports show the tool as unavailable when it is absent.
 - The foundation and initial metadata-curation commits passed hosted macOS and Linux CI. Meta review checks are tracked on PR #2.
 - On 2026-10-17, live Open Library parsing resolved ISBN 9780140328721 to edition OL7353617M (*Fantastic Mr. Fox*), author Roald Dahl, publisher/date/language, and cover provenance, retaining two evidence documents. Google Books was reachable but returned HTTP 429; a successful live Google response remains unverified.
 - Meta documentation was read successfully on 2026-10-17: [Chat Completions](https://dev.meta.ai/docs/protocols/chat-completions), [structured output](https://dev.meta.ai/docs/structured-output), and [authentication](https://dev.meta.ai/docs/authentication). The configured client uses `https://api.meta.ai/v1/chat/completions` and `MODEL_API_KEY`. The key was initially unavailable; the authenticated smoke test above subsequently passed on 2026-10-18.
