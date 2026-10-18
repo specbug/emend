@@ -59,6 +59,18 @@ Structural errors or failed required validators produce `FAILED`. Missing requir
 
 Warnings about publisher styles, missing alt text, duplicate chapter text, or replacement characters are observations; Emend never silently rewrites them. Multi-rendition, DRM-encrypted, scripted, responsive-source-set, and remotely embedded content require manual review in this version. Font obfuscation is retained.
 
+## Find reports and pending review work
+
+```sh
+uv run emend library
+uv run emend library --json
+uv run emend library --limit 100 --offset 100
+```
+
+Open `~/Emend/library.html` for an offline overview of recent books, recorded quality state, metadata proposals, edition candidates, cover comparisons, visual samples, and saved Meta advice. Reports link to existing local files. Labels distinguish current evidence, earlier revisions/policies, applied changes, incomplete captures, and missing or altered evidence. The page suggests inspection commands; it never applies edits or publishes books.
+
+The default shows 200 books, newest updated first. `--limit` accepts 1–1000 and `--offset` moves through larger libraries. HTML and JSON snapshots are regenerated on demand; `--json` prints only the snapshot. Registered review JSON is checked against its stored hash, while EPUB/image bytes are rechecked by the relevant apply, visual-review, and publishing workflows. This overview does not certify current file integrity or replace those gates. Keep it inside the Emend data directory so relative report links continue to work.
+
 ## Research and curate metadata
 
 For an imported book with a valid ISBN:
@@ -206,7 +218,7 @@ ai_review:
   request_timeout_seconds: 90
 ```
 
-The client has been tested against the documented contract using local response fixtures. Authenticated live generation still needs a configured Meta API key. Source providers can also be quota-limited: Google Books currently returns HTTP 429 from the development environment. Missing corroboration remains visible and prevents safe proposals.
+The client has contract/failure tests using local response fixtures and passed an authenticated Muse Spark 1.3 smoke test on 2026-10-18 using synthetic edition metadata. Structured advice and citations validated; book bytes and approval state stayed unchanged, and a repeat review reused the cache without another API call. Source providers can also be quota-limited: Google Books currently returns HTTP 429 from the development environment. Missing corroboration remains visible and prevents safe proposals.
 
 ## Publish approved books to Calibre
 

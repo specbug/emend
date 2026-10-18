@@ -17,7 +17,7 @@ Exact-ISBN Open Library/Google Books research, cached responses, retained eviden
 
 ## Implemented: optional Meta-assisted review
 
-`ai-review` uses [Meta Model API](https://dev.meta.ai/products/meta-model-api), with Muse Spark 1.3 Standard mode by default. It reviews only collected metadata evidence, cites existing proposal/record IDs, saves bounded structured advice with request provenance, and never promotes proposals to safe or applies them. Cached reviews avoid repeated calls; explicit refresh and retries remain user-controlled. The documented API contract and failure handling are tested; authenticated generation awaits `MODEL_API_KEY`.
+`ai-review` uses [Meta Model API](https://dev.meta.ai/products/meta-model-api), with Muse Spark 1.3 Standard mode by default. It reviews only collected metadata evidence, cites existing proposal/record IDs, saves bounded structured advice with request provenance, and never promotes proposals to safe or applies them. Cached reviews avoid repeated calls; explicit refresh and retries remain user-controlled. The documented API contract and failure handling are tested. Authenticated generation passed a synthetic-evidence smoke test on 2026-10-18, including structured citation validation and cache reuse; broader real-edition evaluation remains future work.
 
 ## Delivered: edition discovery and cover review
 
@@ -30,6 +30,10 @@ The complete 157-test suite, including official EPUBCheck integration, passes lo
 ## Implemented: offline visual document review
 
 Version 0.4 adds optional Playwright/Chromium sampling of representative spine/navigation documents, compact/wide viewports, bounded vertical screenshots, geometry observations, and self-contained reports tied to an artifact hash. Scripts and network access are disabled, publisher resources remain unchanged, and no approval state is promoted. These are scrolling browser documents; EPUB pagination and device emulation remain future work.
+
+## Implemented: local library overview
+
+`library` builds a local HTML/JSON index of recorded book states and the latest review evidence, with bounded pages for larger libraries. It shows stale/incomplete/unavailable records, applied metadata/cover history, pending proposals, and inspection commands. It reads existing evidence without provider calls, browser installation, editing, or publishing.
 
 ## Next: pagination and accessibility depth
 
