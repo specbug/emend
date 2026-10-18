@@ -44,6 +44,21 @@ class MetadataChange(BaseModel):
     evidence_urls: list[str]
 
 
+class CoverChange(BaseModel):
+    review_id: str
+    candidate_id: str
+    resource_path: str
+    before_sha256: str
+    after_sha256: str
+    before_dimensions: list[int]
+    after_dimensions: list[int]
+    source: str
+    source_url: str | None = None
+    record_id: str | None = None
+    allowed_smaller: bool = False
+    allowed_aspect_change: bool = False
+
+
 class Report(BaseModel):
     book_id: str
     source_name: str
@@ -61,3 +76,6 @@ class Report(BaseModel):
     applied_proposals: list[str] = Field(default_factory=list)
     parent_artifact_sha256: str | None = None
     parent_report_path: str | None = None
+    cover_changes: list[CoverChange] = Field(default_factory=list)
+    cover_review_id: str | None = None
+    approved_cover_id: str | None = None

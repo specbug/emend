@@ -2,9 +2,15 @@
 
 Validated in the Linux cloud development environment with Python 3.12, Java 21, and the official EPUBCheck 5.3.0 distribution.
 
-## Executed checks
+## Current development branch
 
-- The metadata curation branch passes 135 tests locally, including real EPUBCheck validation of edited EPUB 2 and EPUB 3 artifacts. Research fixtures cover ISBN checksums, exact-edition filtering, conservative reconciliation, source provenance, cache age/integrity, bounded responses, and redirect restrictions. Apply tests cover stale/tampered plans, explicit review, resource/package preservation, validator rejection, database rollback, original reset, and revision-aware publication.
+Edition discovery and cover review/replacement (0.3) now have 22 additional tests. The full suite passes **157 tests**, including official EPUBCheck 5.3.0 checks on both EPUB 2 and EPUB 3 cover replacements. Tests exercise explicit edition selection, review-only proposals, identifier preservation, missing ISBNs, provider failure, stale/tampered records, cover resource preservation, size/aspect exceptions, invalid images, validator failure, database rollback, unrelated-resource mutation, and metadata/cover history.
+
+On 2026-10-17, live Open Library title/author search expanded results into five edition records with 15 retained evidence documents. Results included translations and collections; they remain unconfirmed candidates. An actual recorded cover URL downloaded a verified 326 × 500 JPEG through the restricted downloader. The comparison report was rendered in Chromium at 1280 px and 390 px widths: images loaded at natural proportions and neither viewport had horizontal overflow. Lint, formatting, and package build also pass. See [remaining validation](deferred-validation.md) for limits.
+
+## Previously executed checks
+
+- The merged metadata curation/Meta-review work passed 135 tests locally, including real EPUBCheck validation of edited EPUB 2 and EPUB 3 artifacts. Research fixtures cover ISBN checksums, exact-edition filtering, conservative reconciliation, source provenance, cache age/integrity, bounded responses, and redirect restrictions. Apply tests cover stale/tampered plans, explicit review, resource/package preservation, validator rejection, database rollback, original reset, and revision-aware publication.
 - Meta review tests cover the documented structured-output request, scoped authentication, source-only prompts, cached advice, explicit refresh, stale/tampered plans and reviews, unknown/conflicting citations, malformed/refused/truncated outputs, redirect rejection, timeouts, quota/auth errors, request/response limits, adversarial source text, CLI behavior, and unchanged book approval state. These tests use local transport fixtures, not live model generation.
 - Regression tests cover EPUB 2/3 structure, footnotes and images, broken URLs/fragments, missing resources, duplicate IDs, ZIP traversal, XML entities, malformed input, typography observations, and content fingerprints.
 - Pipeline tests cover exact byte preservation, repeat ingestion, missing/failed/timed-out validators, revocation after failed revalidation, source/artifact tampering, policy changes, escaped HTML reports, and CLI exit codes.
@@ -36,7 +42,7 @@ For another machine, use its actual EPUBCheck JAR path. Without `EMEND_TEST_EPUB
 - The foundation and initial metadata-curation commits passed hosted macOS and Linux CI. Meta review checks are tracked on PR #2.
 - On 2026-10-17, live Open Library parsing resolved ISBN 9780140328721 to edition OL7353617M (*Fantastic Mr. Fox*), author Roald Dahl, publisher/date/language, and cover provenance, retaining two evidence documents. Google Books was reachable but returned HTTP 429; a successful live Google response remains unverified.
 - Meta documentation was read successfully on 2026-10-17: [Chat Completions](https://dev.meta.ai/docs/protocols/chat-completions), [structured output](https://dev.meta.ai/docs/structured-output), and [authentication](https://dev.meta.ai/docs/authentication). The configured client uses `https://api.meta.ai/v1/chat/completions` and `MODEL_API_KEY`. No key was available for authenticated generation; its secret requirement and `api.meta.ai` destination were saved for secure entry.
-- Cover replacement, visual EPUB rendering, general structural repair, and XTEINK transfer remain deferred. No device compatibility or publication-quality certification is claimed.
+- Visual EPUB rendering, general structural repair, and XTEINK transfer remain deferred. No device compatibility or publication-quality certification is claimed.
 
 ## Report presentation
 

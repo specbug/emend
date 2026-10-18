@@ -23,7 +23,7 @@ class Edition(BaseModel):
     provider: Literal["openlibrary", "google_books"]
     record_id: str
     source_url: str
-    isbn: str
+    isbn: str | None
     title: str
     creators: list[str] = Field(default_factory=list)
     publisher: list[str] = Field(default_factory=list)
@@ -53,10 +53,13 @@ class ResearchPlan(BaseModel):
     engine_version: str
     policy_sha256: str
     created_at: str
-    isbn: str
+    isbn: str | None
     metadata: dict[str, list[str]]
     editions: list[Edition]
     documents: list[Evidence]
     proposals: list[Proposal]
     provider_errors: dict[str, str]
     notes: list[str] = Field(default_factory=list)
+    match_mode: Literal["exact_isbn", "reviewed_edition"] = "exact_isbn"
+    selected_record_id: str | None = None
+    discovery_id: str | None = None

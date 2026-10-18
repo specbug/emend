@@ -32,6 +32,6 @@ def choose_isbn(identifiers: list[str], selected: str | None = None) -> str:
         return normalized
     if len(candidates) != 1:
         raise ValueError(
-            "Exact-edition research needs one valid ISBN in the EPUB. If several are present, select one with --isbn. Title-only matching is not yet supported."
+            "Exact-edition research needs one valid ISBN in the EPUB. If several are present, select one with --isbn. For books without ISBNs, use emend discover, then select an edition explicitly."
         )
     return candidates.pop()

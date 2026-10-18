@@ -97,3 +97,6 @@ shutil.copyfile(args[-2],destination)
     config.publish.drive_remote = "gdrive:curated"
     config.publish.backup_remote = "gdrive:backups"
     return config
+
+
+from tests.test_edition_discovery import search_responses  # noqa: E402, F401

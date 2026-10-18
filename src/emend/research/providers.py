@@ -59,6 +59,21 @@ def openlibrary(isbn: str, client: EvidenceClient) -> list[Edition]:
     identifiers = strings(data.get("isbn_13")) + strings(data.get("isbn_10"))
     if isbn not in {normalize_isbn(value) for value in identifiers}:
         return []
+    return [openlibrary_edition(data, url, client, isbn)]
+
+
+def openlibrary_edition(
+    data: dict, url: str, client: EvidenceClient, isbn: str | None = None
+) -> Edition:
+    if isbn is None:
+        isbn = next(
+            (
+                value
+                for item in strings(data.get("isbn_13")) + strings(data.get("isbn_10"))
+                if (value := normalize_isbn(item))
+            ),
+            None,
+        )
     key = data.get("key", "")
     title = data.get("title")
     if (
@@ -101,26 +116,28 @@ def openlibrary(isbn: str, client: EvidenceClient) -> list[Edition]:
         if isinstance(data.get("covers", []), list)
         else []
     )
-    return [
-        Edition(
-            provider="openlibrary",
-            record_id="openlibrary:" + key,
-            source_url="https://openlibrary.org" + key,
-            isbn=isbn,
-            title=title.strip(),
-            creators=creators,
-            publisher=strings(data.get("publishers")),
-            date=date_value(data.get("publish_date")),
-            language=languages,
-            covers=covers,
-            evidence_urls=urls,
-        )
-    ]
+    return Edition(
+        provider="openlibrary",
+        record_id="openlibrary:" + key,
+        source_url="https://openlibrary.org" + key,
+        isbn=isbn,
+        title=title.strip(),
+        creators=creators,
+        publisher=strings(data.get("publishers")),
+        date=date_value(data.get("publish_date")),
+        language=languages,
+        covers=covers,
+        evidence_urls=urls,
+    )
 
 
 def google_books(isbn: str, client: EvidenceClient) -> list[Edition]:
     url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}&maxResults=10"
     data = client.get(url)
+    return google_editions(data, url, isbn)
+
+
+def google_editions(data: dict, url: str, isbn: str | None = None) -> list[Edition]:
     items = data.get("items", [])
     if not isinstance(items, list):
         raise ProviderError("Google Books returned an invalid item list.")
@@ -130,11 +147,18 @@ def google_books(isbn: str, client: EvidenceClient) -> list[Edition]:
             continue
         info = item["volumeInfo"]
         identifiers = info.get("industryIdentifiers", [])
-        if not isinstance(identifiers, list) or isbn not in {
-            normalize_isbn(i.get("identifier", ""))
-            for i in identifiers
-            if isinstance(i, dict) and isinstance(i.get("identifier"), str)
-        }:
+        found = (
+            {
+                value
+                for item in identifiers
+                if isinstance(item, dict)
+                and isinstance(item.get("identifier"), str)
+                and (value := normalize_isbn(item["identifier"]))
+            }
+            if isinstance(identifiers, list)
+            else set()
+        )
+        if isbn is not None and isbn not in found:
             continue
         identifier, title = item.get("id"), info.get("title")
         if (
@@ -150,7 +174,7 @@ def google_books(isbn: str, client: EvidenceClient) -> list[Edition]:
                 provider="google_books",
                 record_id="google_books:" + identifier,
                 source_url="https://books.google.com/books?id=" + identifier,
-                isbn=isbn,
+                isbn=isbn or next(iter(sorted(found)), None),
                 title=title.strip(),
                 creators=strings(info.get("authors")),
                 publisher=strings([info.get("publisher")]),
