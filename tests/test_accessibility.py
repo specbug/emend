@@ -211,6 +211,9 @@ def accessible_book():
     files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
         b"</metadata>", metadata + b"</metadata>"
     )
+    files["EPUB/nav.xhtml"] = files["EPUB/nav.xhtml"].replace(
+        b'<nav epub:type="toc"', b'<nav role="doc-toc" epub:type="toc"'
+    )
     for name, data in files.items():
         if name.endswith(".xhtml"):
             files[name] = (
@@ -231,7 +234,9 @@ def test_official_ace_accepts_clean_automated_audit(tmp_path, config):
         config.tools.epubcheck_jar = Path(jar)
     source = write_epub(tmp_path / "accessible.epub", accessible_book())
     report = ingest(source, config)
-    assert report.state == "VALIDATED", report.model_dump_json(indent=2)
+    assert report.state == "VALIDATED", [
+        g.model_dump() for g in report.gates if g.required and g.status != "passed"
+    ]
     gate = next(g for g in report.gates if g.name == "accessibility")
     assert gate.accessibility.outcome == "passed" and gate.accessibility.findings == []
     assert (config.root / "curated" / f"{report.book_id}.epub").read_bytes() == source.read_bytes()

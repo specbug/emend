@@ -51,7 +51,9 @@ jobs:
               for case in ET.parse(report).iter("testcase"):
                   for problem in case:
                       if problem.tag in {"failure", "error"}:
-                          message = (case.get("name", "Test failure") + "\n" + (problem.text or ""))[:20000]
+                          message = case.get("name", "Test failure") + "\n" + (problem.text or "")
+                          if len(message) > 3800:
+                              message = message[:3800] + "\n[See the job log for the full failure.]"
                           message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
                           print(f"::error::{message}")
           PY
