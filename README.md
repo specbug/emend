@@ -2,7 +2,7 @@
 
 A local, preservation-first EPUB workflow for macOS (including Apple Silicon) and Linux. Emend keeps original books unchanged, produces auditable quality reports, and publishes only after required checks pass. It also backs up and restores **complete Calibre libraries**, including their database, covers, metadata, custom columns, and every stored book format.
 
-Emend includes the reliable foundation, evidence-backed metadata curation, and explicit edition/cover review from [the roadmap](docs/roadmap.md). It runs locally, records evidence for proposed edits, and keeps publication explicit. Optional Meta Model API reviews provide evidence-linked advice; device certification is not implemented.
+Emend includes the reliable foundation, evidence-backed metadata curation, explicit edition/cover review, and optional offline visual sampling from [the roadmap](docs/roadmap.md). It runs locally, records evidence for proposed edits, and keeps publication explicit. Optional Meta Model API reviews provide evidence-linked advice; device certification is not implemented.
 
 ## Install on your Mac
 
@@ -55,7 +55,7 @@ IDs are SHA-256 hashes; commands accept unique prefixes of at least eight charac
 
 The built-in checks cover ZIP structure and CRCs, bounded archive sizes, container/OPF/manifest/spine consistency, required metadata, EPUB 2 NCX and EPUB 3 navigation, duplicate IDs, local links and fragments, CSS resource links, corrupt raster images, and selected typography/accessibility warnings. All source resources and XHTML text are fingerprinted. The initial approved artifact is **byte-identical to the input**. Metadata curation is a separate, explicit operation described below.
 
-Structural errors or failed required validators produce `FAILED`. Missing required tools produce `REVIEW_REQUIRED`. Neither state can publish. Optional check failures remain visible but do not block publication. EPUBCheck is required by default; do not disable it if you need standards validation. Visual QA is explicitly marked unimplemented, and no “Gold,” edition-match, or device-readiness certification is issued.
+Structural errors or failed required validators produce `FAILED`. Missing required tools produce `REVIEW_REQUIRED`. Neither state can publish. Optional check failures remain visible but do not block publication. EPUBCheck is required by default; do not disable it if you need standards validation. Optional visual review produces advisory browser samples; no “Gold,” edition-match, or device-readiness certification is issued.
 
 Warnings about publisher styles, missing alt text, duplicate chapter text, or replacement characters are observations; Emend never silently rewrites them. Multi-rendition, DRM-encrypted, scripted, responsive-source-set, and remotely embedded content require manual review in this version. Font obfuscation is retained.
 
@@ -151,6 +151,26 @@ Smaller images and aspect-ratio changes above 5% are blocked by default. After c
 Applying a cover advances the EPUB 3 modification timestamp, checks content/resource invariants, and reruns required validators. On failure it retains the previous approved artifact and saves rejection evidence. Original bytes and prior revisions remain available; quality reports record old/new image hashes, dimensions, provenance, and any exceptions. Repeating the same successful selection is idempotent. Replacing a cover creates a new artifact revision, so the normal explicit publishing and full-library backup rules still apply.
 
 Remote review downloads up to eight recorded Open Library covers; failures remain visible. `covers` reads a saved review without downloading again. Downloaded images and local inputs are retained by hash, and altered review files/assets cannot be applied. Preview images are scaled only in the report; replacement bytes stay untouched.
+
+## Review EPUB layout offline
+
+Install the optional renderer once:
+
+```sh
+uv sync --frozen --extra visual
+uv run --extra visual playwright install chromium
+uv run --extra visual emend visual-review BOOK_ID
+uv run emend visuals BOOK_ID
+uv run emend visuals BOOK_ID --json
+```
+
+Open the reported `review.html` file for a self-contained screenshot contact sheet. The default samples up to five documents, prioritizing the beginning, middle, and end of the spine, then navigation and additional positions. Each document is captured at **600 × 800** and **1000 × 1400** CSS pixels, with up to three vertical offsets. Select fewer samples with `--profile compact --max-documents 3`; repeat `--profile` to choose both sizes. PNGs and hash-registered JSON live under `~/Emend/visual/BOOK_ID/REVIEW_ID/`.
+
+The renderer uses the EPUB's own XHTML, CSS, images, and fonts from a temporary verified copy. No EPUB changes or uploads occur. A browser context with networking and JavaScript disabled serves only manifest resources from the archive through intercepted requests. Nothing is extracted into a web server. If Chromium is already installed, set `tools.chromium` to its executable path instead of downloading Playwright's browser. `doctor` reports optional renderer availability; actual launch is checked by `visual-review`.
+
+Review hints identify horizontal overflow, failed HTML images/font faces, and visible text elements below 10 CSS pixels. Resource reads are capped at 8 MiB each, screenshots at 48 MiB per review, and sampling stops after the configured tool-time budget (at most 180 seconds, plus any in-flight browser operation). Missing browsers fail explicitly; interrupted captures are saved as **incomplete**, and the command exits nonzero. Warnings in a completed capture are advisory and do not alter publication state. `visuals` verifies report/screenshot hashes and exits nonzero if the book has changed since capture.
+
+These are scrolling Chromium documents, not paginated ebook-reader previews. Compact/wide profiles do not emulate the X4 Pro or Apple Books. Obfuscated fonts, fixed layouts, vertical text, footnote interactions, and unsampled content need reader review. Browser/OS font differences can affect pixels; the report records Chromium's version and viewport sizes. Visual review remains separate from required EPUBCheck and accessibility gates.
 
 ## Ask Meta to review uncertain metadata
 

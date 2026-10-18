@@ -116,7 +116,7 @@ def ingest(source: Path, config: Config) -> Report:
                     name="visual_qa",
                     status="skipped",
                     required=False,
-                    detail="Not implemented in milestone 1. No visual or device-readiness claim.",
+                    detail="Not run during ingestion. Use visual-review for separate advisory browser samples.",
                 )
             )
             # Check again after external tools: they must not have changed the input.

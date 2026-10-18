@@ -61,6 +61,8 @@ def doctor(config: ConfigOption = None):
     """Check local tooling and configuration without changing your library."""
     try:
         settings = load_config(config)
+        from emend.visual import availability
+
         epubcheck = epubcheck_command(settings)
         results = {
             "root": str(settings.root),
@@ -78,7 +80,7 @@ def doctor(config: ConfigOption = None):
             "meta_api_key": "configured"
             if os.environ.get("MODEL_API_KEY")
             else "not configured (optional)",
-            "visual_qa": "not implemented; no device-readiness certification",
+            "visual_qa": availability(settings),
         }
         typer.echo(json.dumps(results, indent=2))
         missing = (settings.quality.require_epubcheck and not epubcheck) or (
@@ -485,6 +487,63 @@ def reset_original(book_id: str, config: ConfigOption = None):
         result = ingest_book(settings.root / "originals" / f"{identifier}.epub", settings)
         typer.echo(report_text(result))
         if result.state != "VALIDATED":
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("visual-review")
+def visual_review_command(
+    book_id: str,
+    config: ConfigOption = None,
+    profile: Annotated[
+        list[str] | None, typer.Option(help="compact or wide; repeat to select both.")
+    ] = None,
+    max_documents: Annotated[int, typer.Option(min=1, max=9)] = 5,
+):
+    """Capture offline browser samples without changing book approval or publication."""
+    from emend.visual import visual_review
+
+    try:
+        settings = load_config(config)
+        result = visual_review(book_id, settings, profiles=profile, max_documents=max_documents)
+        path = Store(settings.root).document(result.book_id, "visual-review", result.id)["path"]
+        typer.echo(
+            f"Sampling {result.status}. Review: {result.id}\nOpen: {Path(path).with_suffix('.html')}"
+        )
+        if result.status == "incomplete":
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("visuals")
+def visuals_command(
+    book_id: str,
+    config: ConfigOption = None,
+    review: str | None = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Verify and read saved screenshots; flag reviews from an earlier artifact."""
+    from emend.research.discovery import current_source
+    from emend.visual import load_visual_review
+
+    try:
+        settings = load_config(config)
+        store = Store(settings.root)
+        row, _, digest = current_source(store, book_id, settings)
+        result = load_visual_review(store, row["id"], review)
+        current = result.artifact_sha256 == digest
+        if as_json:
+            typer.echo(
+                json.dumps({"current_artifact": current, "review": result.model_dump()}, indent=2)
+            )
+        else:
+            path = store.document(row["id"], "visual-review", result.id)["path"]
+            typer.echo(
+                f"Review {result.id}: {result.status}\nArtifact: {'current' if current else 'STALE; rerun visual-review'}\nOpen: {Path(path).with_suffix('.html')}"
+            )
+        if not current or result.status == "incomplete":
             raise typer.Exit(1)
     except (ValueError, OSError) as exc:
         fail(exc)

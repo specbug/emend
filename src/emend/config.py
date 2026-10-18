@@ -33,6 +33,7 @@ class ToolPaths(StrictModel):
     epubcheck_jar: Path | None = None
     ace: Path | None = None
     rclone: Path | None = None
+    chromium: Path | None = None
 
 
 class Publishing(StrictModel):
