@@ -83,8 +83,8 @@ def accessibility_html(report: Report) -> str:
             f"<p>{esc(finding.message)}</p><code>{esc(location)}</code></li>"
         )
     summary = (
-        f"{audit.failed} violations · {audit.incomplete} unresolved outcomes. "
-        "Parent/document summaries are not counted again as separate violations."
+        f"{audit.failed} {'violation' if audit.failed == 1 else 'violations'} · "
+        f"{audit.incomplete} unresolved {'outcome' if audit.incomplete == 1 else 'outcomes'}."
     )
     if audit.truncated:
         summary += (

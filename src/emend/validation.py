@@ -103,7 +103,7 @@ def validate_ace(epub: Path, directory: Path, config: Config) -> Gate:
             name="accessibility",
             status="passed" if passed else "failed",
             required=required,
-            detail=f"Exit {result.returncode}; {audit.failed} violations, {audit.incomplete} unresolved outcomes. Automated checks only; manual accessibility review remains required.",
+            detail=f"Exit {result.returncode}; {audit.failed} {'violation' if audit.failed == 1 else 'violations'}, {audit.incomplete} unresolved {'outcome' if audit.incomplete == 1 else 'outcomes'}. Automated checks only; manual accessibility review remains required.",
             evidence=str(report_path),
             accessibility=audit,
         )
