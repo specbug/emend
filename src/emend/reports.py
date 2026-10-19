@@ -176,7 +176,7 @@ def write_reports(report: Report, directory: Path) -> Path:
 <main>
 <header><div class="brand">EMEND / QUALITY REPORT</div><h1>{esc(title)}</h1><p class="state">{report.state}</p>
 <p>Original preserved · {"Curated changes recorded" if report.changes else "No editorial changes"}</p><code>{report.book_id}</code></header>
-{"<p>Revalidation of the retained current EPUB; edit history preserved. The recorded hash identifies the book being checked, not publication approval.</p>" if report.revalidation else ""}
+{"<p class='revalidation-note'>Revalidation of the retained current EPUB; metadata and cover edits preserved.</p>" if report.revalidation else ""}
 <h2>Publication gates</h2><table><thead><tr><th>Check</th><th>Result</th><th>Policy</th><th>Evidence summary</th></tr></thead><tbody>{gates}</tbody></table>
 {accessibility_html(report)}
 <h2>Metadata changes</h2><ul>{changes}</ul>

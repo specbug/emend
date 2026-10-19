@@ -52,6 +52,7 @@ code { font-family: var(--mono); overflow-wrap: anywhere; font-size: 0.8rem; lin
   margin-bottom: 1rem;
 }
 .state::before { content: "\2014"; margin-right: 0.5rem; }
+.revalidation-note { margin-top: 1.5rem; }
 table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem; line-height: 1.6; }
 td, th { padding: 1rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
 td:first-child, th:first-child { padding-left: 0; }
