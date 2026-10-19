@@ -137,7 +137,7 @@ def apply_proposals(
             or previous.policy_sha256 != config.policy_hash()
         ):
             raise ValueError(
-                "Quality policy or engine changed; re-ingest before applying metadata."
+                "Quality policy or engine changed; run emend revalidate before applying metadata."
             )
         if (
             plan.engine_version != ENGINE_VERSION

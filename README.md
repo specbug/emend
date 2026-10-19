@@ -37,9 +37,9 @@ command -v ace-cli
 
 Set `tools.ace` to the absolute executable path printed above. An existing `ace` executable on `PATH` also works. The CLI installation includes its Puppeteer browser; this is separate from Emend's optional Playwright visual renderer. `scripts/setup-ace.sh` installs the pinned CLI in `EMEND_ACE_DIR` for integration testing.
 
-On the next ingestion or explicit metadata/cover application, Ace findings appear in the quality report's HTML, text, and JSON: rule, impact, document, and CSS selectors when supplied by Ace. Reports record the Ace version and raw JSON fingerprint. The original Ace report remains beside the quality report under `ace/report.json`; document/report summaries are not counted again as separate violations. A required audit blocks publication on violations, unresolved outcomes, malformed evidence, or a failed process. An optional failed audit stays visible in the library overview without blocking publication.
+On ingestion, `revalidate`, or explicit metadata/cover application, Ace findings appear in the quality report's HTML, text, and JSON: rule, impact, document, and CSS selectors when supplied by Ace. Reports record the Ace version and raw JSON fingerprint. The original Ace report remains beside the quality report under `ace/report.json`; document/report summaries are not counted again as separate violations. A required audit blocks publication on violations, unresolved outcomes, malformed evidence, or a failed process. An optional failed audit stays visible in the library overview without blocking publication.
 
-Set `quality.require_accessibility_audit: true` to require the audit. Existing reports remain readable and do not gain findings retroactively. Do not re-ingest an original just to refresh these findings if you want to retain its curated edits: ingestion resets that book to the original. A clean automated audit still needs manual screen-reader, reading-order, image-description, navigation/footnote, contrast, and resizing review. Emend does not add accessibility conformance metadata or rewrite the book.
+Set `quality.require_accessibility_audit: true` to require the audit, then run `emend revalidate BOOK_ID` to refresh an existing book while retaining its curated edits. Existing reports remain readable and do not gain findings retroactively. A clean automated audit still needs manual screen-reader, reading-order, image-description, navigation/footnote, contrast, and resizing review. Emend does not add accessibility conformance metadata or rewrite the book.
 
 Emend reads at most 32 MiB of Ace JSON, rejects malformed or excessively nested assertion trees, and retains at most 500 finding details with bounded text/selectors. Counts include the entire parsed audit; shortened summaries are labelled and full evidence remains in the raw report. These bounds apply to Emend's parser, not Ace's own output generation.
 
@@ -134,7 +134,22 @@ metadata:
 
 Publishing an edited artifact creates a separately identified revision in Calibre and a hash-named EPUB in Drive. It does **not** overwrite an existing Calibre entry or migrate annotations between revisions. Each revision/destination has its own retryable receipt. Full-library backup continues to preserve all entries and their stored data.
 
-Upgrading from 0.1: old reports require revalidation with the new engine (`reset-original` or re-ingest the original). SQLite research tables are added without deleting existing books or receipts. Back up the Emend data directory separately if you want to preserve its research/history; Calibre-library backups cover the Calibre library itself.
+Upgrading from 0.1: old reports require `revalidate BOOK_ID` with the new engine. SQLite research tables are added without deleting existing books or receipts. Back up the Emend data directory separately if you want to preserve its research/history; Calibre-library backups cover the Calibre library itself.
+
+## Refresh validation without undoing edits
+
+```sh
+uv run emend revalidate BOOK_ID
+uv run emend revalidate BOOK_ID --json
+```
+
+Use this after installing a validator, changing quality policy, or upgrading the validation engine. It checks the **current curated EPUB**, preserves its exact bytes and metadata/cover history, and records fresh inspection, EPUBCheck, and Ace evidence. If an initial import never produced a curated artifact, it checks the preserved original. It refuses missing or mismatched input hashes; it does not adopt an externally modified file as a new approved revision.
+
+Revalidation commits a `REVIEW_REQUIRED` report before running inspection or external tools. Missing required tools leave the book in `REVIEW_REQUIRED`; failed required gates leave it `FAILED`. The current EPUB stays retained for review and retry, while publication and further curation remain blocked. Fix the reported problem and rerun the same command. If the process is interrupted or the final report/state cannot be saved, the pending report continues to block publication and identifies the retained book for a retry. Preflight failures leave the earlier record intact; publishing independently checks policy and input hashes.
+
+Validators receive a bounded temporary copy. Emend checks that copy and the stored inputs for unexpected changes. Existing reports and publication receipts remain in history; successfully rechecking unchanged bytes does not create a new delivery revision. Visual/research evidence remains tied to its recorded bytes and its own policy/version checks. No publishing happens automatically, and copies already delivered to Calibre or Drive are not withdrawn by a failed audit.
+
+In a revalidation report, `artifact_sha256` identifies the retained bytes **even when validation fails**. Approval requires `state: VALIDATED`, matching policy/engine, and passing required gates. Use `reset-original` or re-ingest an original only when you intend to discard that book's current curated edits.
 
 ## Discover editions when an EPUB has no ISBN
 

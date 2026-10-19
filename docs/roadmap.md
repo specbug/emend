@@ -43,6 +43,8 @@ Version 0.5 adds `visual-review --layout paginated` for horizontal LTR reflowabl
 
 Version 0.6 adds structured Ace rule findings to quality reports, raw-evidence fingerprints, conservative handling of incomplete/malformed results, and optional-audit warnings in the library overview. Hosted integration tests exercise DAISY Ace 1.4.6 on original EPUB 2/3 fixtures. Automated audits remain separate from manual conformance review.
 
+Version 0.7 adds `revalidate` to refresh quality evidence for the current EPUB while preserving curated metadata, cover bytes, and history. Approval is revoked before checks start; failed or interrupted attempts retain the current bytes for review and retry, with publication blocked. An unchanged successful revalidation keeps the same revision identity and publication receipts.
+
 Calibrate browser pagination against real reader screenshots, extend supported writing/layout modes, and verify footnote behavior. Broaden accessibility testing to a real-book corpus and screen readers, extend font/footnote/layout coverage, and add optional multimodal advice. Actual Apple Books and XTEINK checks remain necessary before making device claims.
 
 ## Later: device delivery and automation

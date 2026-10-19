@@ -64,6 +64,16 @@ An original synthetic chapter produced 15 compact pages and 5 wide pages, with f
 
 The test corpus establishes the controlled browser behavior, not matching page counts in Calibre, Apple Books, or XTEINK. This first paginated mode supports horizontal LTR reflowable content only. Page counts are per document; left/right blank-page parity and interactive footnote placement remain outside its scope.
 
+## Current EPUB revalidation (0.7)
+
+The revalidation extension adds 23 cases. The complete local suite passes **262 tests**, with five full Ace CLI cases explicitly skipped for hosted CI. It checks unchanged curated EPUB 2/3 bytes and metadata/cover history, required versus optional audits, current-artifact research and visual evidence after a failed audit, policy/engine refresh, unchanged delivery receipts, recovery of an initial import without an artifact, structural failures, tampered/missing inputs, validator mutation of temporary copies, bounded snapshots, CLI output/status, and operation locking.
+
+Interruption coverage forcibly kills a CLI process group after its validator starts, verifies the persisted `REVIEW_REQUIRED` state and retained curated identity, then successfully retries. Injected inspection, final-report write, and final-database write failures also leave a retryable pending report. This establishes process-interruption behavior, not machine/power-loss durability.
+
+Official EPUBCheck cases revalidate metadata/cover edits in EPUB 2 and EPUB 3. Hosted macOS/Linux CI additionally runs the official DAISY Ace CLI on clean and missing-alt EPUBs through the new revalidation command. The managed cloud browser's Ace local-file limitation still applies. See the CI result for the exact commit under review.
+
+A standalone curated fixture passed official EPUBCheck again without changing its artifact hash, metadata, or cover history. Its report was rendered at 1280 px and 390 px with no horizontal overflow. Lint, formatting, and wheel/sdist builds pass. Revalidation reports retain `artifact_sha256` as identity even on failure; state, policy, engine, and required gates determine approval.
+
 ## Authenticated Meta smoke test — 2026-10-18
 
 The configured `MODEL_API_KEY` was reported ready and used through the inherited HTTPS proxy with the existing production client. One request to `muse-spark-1.3` reviewed an ambiguous publisher proposal for an original synthetic EPUB and fixture edition records. No personal book text or files were uploaded, and no credential value was printed or saved.
