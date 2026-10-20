@@ -76,6 +76,21 @@ Structural errors or failed required validators produce `FAILED`. Missing requir
 
 Warnings about publisher styles, missing alt text, duplicate chapter text, or replacement characters are observations; Emend never silently rewrites them. Multi-rendition, DRM-encrypted, scripted, responsive-source-set, and remotely embedded content require manual review in this version. Font obfuscation is retained.
 
+## Import from an inbox
+
+```sh
+uv run emend inbox                         # One batch from ~/Emend/inbox
+uv run emend inbox --watch                 # Foreground polling; Ctrl+C stops
+uv run emend inbox --directory ~/Downloads/EPUB-Inbox --watch --stable-seconds 3
+uv run emend inbox --json
+```
+
+The inbox imports top-level `.epub` files after two unchanged observations, two seconds apart by default. It leaves source files in place and ignores hidden files, symlinks, subdirectories, and other extensions. A quiet interval is a heuristic: download as `book.epub.part`, then rename to `book.epub` when finished. Copies are bounded and checked again for changes before ingestion. Custom directories must already exist and cannot be inside managed data (except the inbox) or the configured Calibre library. Each scan allows at most 10,000 directory entries; archive-size limits still apply.
+
+Exact copies of known originals **or retained curated revisions** are skipped under the same lock used for importing. Renaming a file or restarting the watcher does not reset curated edits or rerun validators. `known` means retained data exists, not that its current quality gates pass. Failed or incomplete imports remain available for explicit investigation: use `report` and `revalidate` when a complete report exists. An interrupted import without a complete report needs recovery from its original; ordinary `ingest` resets curated edits, so inspect retained data before choosing that path.
+
+Batch mode uses one observation window and exits `1` if files are still changing, blocked, busy, or errored; retry later. It exits `0` for imported/known files or an empty inbox, and `2` for command/configuration errors. `--json` returns one batch object; `--watch --json` emits newline-delimited events, suppressing repeated unchanged statuses. Watching processes books sequentially and retries busy operations on subsequent scans. It runs only while the command is open; there is no background service. Ingestion never researches, edits, or publishes automatically.
+
 ## Find reports and pending review work
 
 ```sh
@@ -340,7 +355,7 @@ Exports use stable hash filenames and contain only the approved EPUB, without Ca
 ```text
 ~/Emend/
   config.yaml
-  inbox/                    # Reserved for manual drop-off; no watcher yet
+  inbox/                    # Stable-file batch import / foreground watcher
   originals/<SHA>.epub       # Preserved sources
   curated/<SHA>.epub         # Only artifacts whose required gates passed
   reports/<SHA>/<RUN>/       # JSON, HTML, text, and validator evidence

@@ -11,6 +11,10 @@ def now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+class OperationBusyError(ValueError):
+    """Another process holds the operation lock; safe to retry later."""
+
+
 class Store:
     def __init__(self, root: Path):
         self.root = root
@@ -62,7 +66,7 @@ class Store:
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as exc:
-                raise ValueError(
+                raise OperationBusyError(
                     "Another Emend operation is running. Retry when it finishes."
                 ) from exc
             try:

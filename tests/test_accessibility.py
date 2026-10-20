@@ -234,9 +234,14 @@ def test_official_ace_accepts_clean_automated_audit(tmp_path, config):
         config.tools.epubcheck_jar = Path(jar)
     source = write_epub(tmp_path / "accessible.epub", accessible_book())
     report = ingest(source, config)
-    assert report.state == "VALIDATED", [
-        g.model_dump() for g in report.gates if g.required and g.status != "passed"
-    ]
+    failures = []
+    for gate in report.gates:
+        if gate.required and gate.status != "passed":
+            detail = f"{gate.name}: {gate.detail}"
+            if gate.evidence and (log := Path(gate.evidence)).suffix == ".log":
+                detail += "\n" + log.read_text(errors="replace")[-2500:]
+            failures.append(detail)
+    assert report.state == "VALIDATED", "\n".join(failures)
     gate = next(g for g in report.gates if g.name == "accessibility")
     assert gate.accessibility.outcome == "passed" and gate.accessibility.findings == []
     assert (config.root / "curated" / f"{report.book_id}.epub").read_bytes() == source.read_bytes()

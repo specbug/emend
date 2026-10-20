@@ -39,6 +39,9 @@ Keep reader compatibility claims tied to actual device evidence.
   bounded reads, archive/path checks, escaped report content, and disabled book
   scripts/network access in visual previews. Never commit books, credentials, or
   generated library/review data as development fixtures.
+- Treat publication-quality typography and layout as a product requirement.
+  Keep personal reference books and their locations private; never commit links
+  or identifying details. Validator success alone does not establish visual quality.
 - Preserve publisher typography. Emend report styling follows the existing
   [report CSS](src/emend/assets/report.css): warm neutrals, consistent spacing,
   readable line lengths, responsive layouts, and bundled licensed fonts. Check
@@ -48,6 +51,8 @@ Keep reader compatibility claims tied to actual device evidence.
 
 - `inspect.py`, `pipeline.py`, `storage.py`, `models.py`: inspection, preserved
   artifacts, lifecycle state, and saved evidence models.
+- `inbox.py`: stable-file batch/foreground ingestion. Always use the atomic
+  `ingest_new` path for automation; ordinary `ingest` intentionally resets books.
 - `research/`, `curation.py`, `covers.py`, `cover_apply.py`: discovery, advice,
   explicit metadata/cover edits, and rollback.
 - `validation.py`, `revalidation.py`, `accessibility.py`, `visual.py`,
