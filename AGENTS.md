@@ -80,6 +80,7 @@ Report skipped integrations separately from passing checks.
 | EPUBCheck | Java 21 and `bash scripts/setup-cloud.sh`; set `EMEND_TEST_EPUBCHECK_JAR` to the installed JAR. The script verifies the official distribution checksum. |
 | Browser review | `uv run --extra visual playwright install chromium`; set `EMEND_TEST_PLAYWRIGHT=1`, or use `EMEND_TEST_CHROMIUM` with an existing Chromium executable. |
 | DAISY Ace | Node.js 22+ and `bash scripts/setup-ace.sh`; set `EMEND_TEST_ACE` to the installed `node_modules/.bin/ace-cli`. Its Puppeteer browser is separate from Playwright. |
+| Calibre | On Linux x86_64, `bash scripts/setup-calibre.sh` installs a checksum-verified official build. Set `EMEND_TEST_CALIBRE_BIN` to the directory containing `calibredb`, `ebook-meta`, `ebook-convert`, and `calibre-debug`. Other platforms can use an existing installation. Tests use disposable libraries. |
 
 [CI](.github/workflows/tests.yml) is the reference for the combined macOS/Linux
 integration setup. Never weaken assertions or substitute a mocked success for a
@@ -90,7 +91,7 @@ hardware access.
 In managed cloud sessions, use the existing isolated checkout. Set
 `UV_CACHE_DIR=/workspace/.cache/uv` if the default cache is unwritable. Setup
 scripts default to `/workspace/.tools`; override `EMEND_TOOLS_DIR` and
-`EMEND_ACE_DIR` with writable paths elsewhere. Inspect current runtime/network
+`EMEND_ACE_DIR`/`EMEND_CALIBRE_DIR` with writable paths elsewhere. Inspect current runtime/network
 policy, preserve injected authentication and proxy settings, and never print
 secret values. Cloud Chromium may block Ace's `file:` navigation; use hosted CI
 for the unchanged CLI integration and record the local limitation.

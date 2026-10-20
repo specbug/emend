@@ -274,7 +274,7 @@ uv run emend publish BOOK_ID
 uv run emend publish --ready
 ```
 
-Publishing is explicit, separate from ingestion, and uses `calibredb`; Emend never writes Calibre's database directly. A `emend` identifier and per-destination receipts make retries idempotent. Existing books with the same title may coexist if their source bytes differ. Emend rechecks the original and artifact hashes and the quality policy before publishing, and verifies the stored EPUB after importing into Calibre. If an import plugin changes the file, delivery remains pending for review. If policy changes, re-ingest the preserved original first.
+Publishing is explicit, separate from ingestion, and uses `calibredb`; Emend never writes Calibre's database directly. A `emend` identifier and per-destination receipts make retries idempotent. Existing books with the same title may coexist if their source bytes differ. Emend rechecks the original and artifact hashes and the quality policy before publishing, and verifies the stored EPUB after importing into Calibre. If an import plugin changes the file, delivery remains pending for review. If policy changes, run `emend revalidate BOOK_ID` first to retain curated edits.
 
 Receipts record successful deliveries; they do not continually inspect remote state. Deleting a delivered book outside Emend does not automatically invalidate its receipt.
 
@@ -358,6 +358,15 @@ uv run pytest
 uv run ruff check .
 ```
 
-The generated regression corpus contains EPUB 2/3 books, footnotes, illustrations, malformed containers, unsafe references, and damaged resources. Publisher tests use local fake executables; they do not access a personal Calibre library or Google Drive. See [validation notes](docs/validation.md) for what has actually been exercised.
+The generated regression corpus contains EPUB 2/3 books, footnotes, illustrations, malformed containers, unsafe references, and damaged resources. Publisher boundary tests use local fake executables. Optional real Calibre tests create disposable libraries and exercise import, rich metadata/notes/annotations, backup, and restore. They do not access a personal library or Google Drive account. See [validation notes](docs/validation.md) for what has actually been exercised.
+
+On Linux x86_64, install the checksum-verified official Calibre CLI and run those integration tests:
+
+```sh
+bash scripts/setup-calibre.sh
+EMEND_TEST_CALIBRE_BIN=/workspace/.tools/calibre-9.16.0 uv run pytest -q tests/test_calibre_integration.py
+```
+
+Override `EMEND_CALIBRE_DIR` for another installation directory. On macOS, the tests can instead use an existing `/Applications/calibre.app/Contents/MacOS` directory. They isolate Calibre configuration and Qt runs offscreen. With rclone installed, the rich-library test also transfers its backup through a local backend before restoring it. Hosted Linux CI enables these checks; macOS CI explicitly skips them until given Calibre.
 
 Exit codes: `0` success; `1` blocked quality gates or pending publication/upload; `2` invalid configuration, input, or operational error. No automatic publication occurs merely by inspecting or ingesting a book.
