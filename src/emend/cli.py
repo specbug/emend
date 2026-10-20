@@ -200,6 +200,46 @@ def inbox(
         fail(exc)
 
 
+@app.command("repair-plan")
+def repair_plan(
+    book_id: str,
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Propose supported container repairs; leave the EPUB and approval unchanged."""
+    from emend.repairs import prepare_repairs
+
+    try:
+        plan, review = prepare_repairs(book_id, load_config(config))
+        typer.echo(
+            plan.model_dump_json(indent=2)
+            if as_json
+            else f"Plan: {plan.id}\nActions: {', '.join(plan.actions) or '(none supported)'}\n{plan.detail}\nReview: {review}"
+        )
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("apply-repairs")
+def apply_repairs_command(
+    book_id: str,
+    plan: Annotated[str, typer.Option("--plan")],
+    approve: Annotated[
+        list[str], typer.Option("--approve", help="Explicitly approve an action ID.")
+    ],
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Apply explicitly approved repairs, validate, and retain the previous book on failure."""
+    from emend.repairs import apply_repairs
+
+    try:
+        result = apply_repairs(book_id, load_config(config), plan_id=plan, approve=approve)
+        typer.echo(result.model_dump_json(indent=2) if as_json else report_text(result))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 @app.command()
 def revalidate(
     book_id: str,

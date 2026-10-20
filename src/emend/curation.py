@@ -262,6 +262,7 @@ def apply_proposals(
                         for p in selected
                     ],
                     cover_changes=previous.cover_changes,
+                    repair_changes=previous.repair_changes,
                     metadata_changes=previous.metadata_changes
                     + [
                         MetadataChange(

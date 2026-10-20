@@ -39,6 +39,12 @@ Version 0.4 adds optional Playwright/Chromium sampling of representative spine/n
 
 Version 0.5 adds `visual-review --layout paginated` for horizontal LTR reflowable books. Chromium columns provide numbered first/middle/last-page samples with recorded reader margins. Preview-only geometry and break adaptation leave EPUB bytes and publisher text/font styling intact. Unsupported fixed/RTL/vertical layouts are explicit; oversized content, text-edge spillover, and positioned elements produce observations. Existing scrolling reviews remain supported.
 
+## Implemented: explicit container repair
+
+Version 0.9 adds fingerprinted repair proposals with before/after packaging details, a local HTML review, and explicit action approval. Its first action fixes the order/compression of an existing valid `mimetype` ZIP entry and clears that entry's extra fields. All resource payloads, reading content, metadata, and spine order remain unchanged; required validators run before activation. Failed candidates retain the previous book and report, and successful repairs retain revision/history records. Other structural defects and extra-field-only problems remain unsupported.
+
+Further work includes a broader structural-repair catalog, reviewed navigation/link repairs where intent can be established, and explicit typography proposals with visual comparisons. Those changes need their own preservation rules and corpus evidence; the container repair does not establish publication-quality layout.
+
 ## Next: reader calibration and accessibility depth
 
 Version 0.6 adds structured Ace rule findings to quality reports, raw-evidence fingerprints, conservative handling of incomplete/malformed results, and optional-audit warnings in the library overview. Hosted integration tests exercise DAISY Ace 1.4.6 on original EPUB 2/3 fixtures. Automated audits remain separate from manual conformance review.
