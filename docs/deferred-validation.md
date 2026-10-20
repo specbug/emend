@@ -11,6 +11,6 @@ Further validation needs real library/device access or a broader corpus:
 - Verify a successful live Google Books response when quota permits. HTTP 429 is reported as a provider failure, not corroboration.
 - Test a real Calibre library backup/restore and authenticated Google Drive delivery locally. The full-fidelity fixture and real rclone local-backend checks do not establish access to the user's account or library.
 - Evaluate Meta advice on a broader set of real editions and ambiguous/conflicting records. An authenticated synthetic-evidence smoke test passed on 2026-10-18; contract/failure coverage still uses deterministic fixtures.
-- Extend interruption testing beyond validator rejection and database rollback to process termination and filesystem exhaustion.
+- Revalidation now has process-kill recovery and injected report/database-write failure coverage. Broaden this to other workflows, real filesystem exhaustion, and machine/power loss.
 
 These remaining checks do not make the completed preservation tests or official EPUBCheck runs substitutes for device review.

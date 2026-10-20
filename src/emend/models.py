@@ -88,7 +88,10 @@ class Report(BaseModel):
     state: Literal["FAILED", "REVIEW_REQUIRED", "VALIDATED"]
     inspection: Inspection
     gates: list[Gate]
+    # Revalidation retains identity even when approval is revoked. Publication
+    # always requires the state, policy, and required gates to pass as well.
     artifact_sha256: str | None = None
+    revalidation: bool = False
     changes: list[str] = Field(default_factory=list)
     metadata_changes: list[MetadataChange] = Field(default_factory=list)
     research_plan_id: str | None = None

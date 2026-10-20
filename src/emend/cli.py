@@ -13,6 +13,7 @@ from emend.pipeline import get_report
 from emend.pipeline import ingest as ingest_book
 from emend.publish import publish as publish_book
 from emend.reports import report_text
+from emend.revalidation import revalidate as revalidate_book
 from emend.storage import Store
 from emend.validation import epubcheck_command
 
@@ -128,6 +129,26 @@ def list_books(config: ConfigOption = None):
             typer.echo(f"{row['id'][:12]}  {row['state']:<16} {row['source_name']}")
         if not rows:
             typer.echo("No books imported. Run emend ingest /path/to/book.epub.")
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command()
+def revalidate(
+    book_id: str,
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Rerun quality gates on the current EPUB, retaining metadata and cover edits."""
+    try:
+        settings = load_config(config)
+        result = revalidate_book(book_id, settings)
+        typer.echo(result.model_dump_json(indent=2) if as_json else report_text(result))
+        if not as_json:
+            row = Store(settings.root).resolve(result.book_id)
+            typer.echo(f"\nReports: {Path(row['report_path']).parent}")
+        if result.state != "VALIDATED":
+            raise typer.Exit(1)
     except (ValueError, OSError) as exc:
         fail(exc)
 

@@ -22,7 +22,8 @@ Keep reader compatibility claims tied to actual device evidence.
   explicit, narrowly scoped, independently checked, validated before activation,
   and rolled back on failure. Preserve unrelated resources, reading text, and
   spine order. Re-ingesting an original resets its curated artifact; account for
-  this when designing refresh/revalidation workflows.
+  this when designing refresh workflows. Use `revalidate` to refresh quality
+  checks on the current bytes without discarding edits.
 - Metadata, cover, and Meta AI advice must retain their evidence and provenance.
   Advice does not apply edits or promote approval. Meta integration uses the
   official Meta Model API; keep model/provider details in configuration and docs.
@@ -49,8 +50,9 @@ Keep reader compatibility claims tied to actual device evidence.
   artifacts, lifecycle state, and saved evidence models.
 - `research/`, `curation.py`, `covers.py`, `cover_apply.py`: discovery, advice,
   explicit metadata/cover edits, and rollback.
-- `validation.py`, `accessibility.py`, `visual.py`, `pagination.py`: external
-  validators, Ace evidence parsing, and advisory browser review.
+- `validation.py`, `revalidation.py`, `accessibility.py`, `visual.py`,
+  `pagination.py`: validators, refresh of current-artifact approval, Ace evidence
+  parsing, and advisory browser review.
 - `reports.py`, `library.py`, `assets/`, `cli.py`: local reports, overview, and CLI.
 - `publish.py`, `backup.py`: delivery and full-library backup/restore.
 - Paths above are relative to `src/emend/`. `tests/epub_factory.py` supplies small

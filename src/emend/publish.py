@@ -145,7 +145,7 @@ def publish(book_id: str, targets: list[str], config: Config) -> dict:
             raise ValueError("Publication blocked: this book has not passed its required gates.")
         if report.policy_sha256 != config.policy_hash() or report.engine_version != ENGINE_VERSION:
             raise ValueError(
-                "Quality policy or engine changed. Re-ingest the preserved original before publishing."
+                "Quality policy or engine changed. Run emend revalidate before publishing."
             )
         if any(g.required and g.status != "passed" for g in report.gates):
             raise ValueError("Publication blocked: required checks are incomplete.")
