@@ -49,6 +49,8 @@ Calibrate browser pagination against real reader screenshots, extend supported w
 
 ## Later: device delivery and automation
 
-Verify the X4 Pro's installed firmware and supported transfer protocol before implementing CrossPoint delivery. Add a stable-file inbox watcher, stage caches, scheduling, per-device profiles, and a focused review UI after the inspection/repair corpus is established.
+Version 0.8 adds safe inbox ingestion: one-shot batches or foreground polling, stable-file observation and bounded snapshots, and atomic recognition of known originals and retained curated revisions. It preserves source files, retries busy operations, and keeps research/editing/publication explicit. It does not install a background service.
 
-Only the optional AI review command requires an AI credential. Firmware installation, background watching, rendering, and typography transformation are not required for the current workflow. Advanced checks are not represented as passing placeholders.
+Verify the X4 Pro's installed firmware and supported transfer protocol before implementing CrossPoint delivery. Stage caches, scheduling, per-device profiles, and a focused review UI remain later work after the inspection/repair corpus is established.
+
+Only the optional AI review command requires an AI credential. Firmware installation, background services, rendering, and typography transformation are not required for the current workflow. Advanced checks are not represented as passing placeholders.

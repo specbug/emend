@@ -1,6 +1,8 @@
 import json
+import math
 import os
 from pathlib import Path
+from time import sleep
 from typing import Annotated
 
 import typer
@@ -8,6 +10,7 @@ import yaml
 
 from emend.backup import backup_library, restore_backup, upload_backup, verify_backup
 from emend.config import Config, default_config_path, executable, load_config
+from emend.inbox import Inbox
 from emend.inspect import inspect_epub
 from emend.pipeline import get_report
 from emend.pipeline import ingest as ingest_book
@@ -129,6 +132,70 @@ def list_books(config: ConfigOption = None):
             typer.echo(f"{row['id'][:12]}  {row['state']:<16} {row['source_name']}")
         if not rows:
             typer.echo("No books imported. Run emend ingest /path/to/book.epub.")
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command()
+def inbox(
+    directory: Annotated[
+        Path | None, typer.Option("--directory", help="Existing folder; defaults to Emend's inbox.")
+    ] = None,
+    watch: Annotated[
+        bool, typer.Option("--watch", help="Keep polling in the foreground until Ctrl+C.")
+    ] = False,
+    stable_seconds: Annotated[
+        float, typer.Option(min=0.1, max=300, help="Required unchanged observation interval.")
+    ] = 2,
+    interval: Annotated[
+        float, typer.Option(min=0.1, max=60, help="Polling interval in watch mode.")
+    ] = 1,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+    config: ConfigOption = None,
+):
+    """Import stable, new EPUBs without resetting known books or publishing."""
+    try:
+        if not math.isfinite(interval):
+            raise ValueError("Polling interval must be finite.")
+        processor = Inbox(load_config(config), directory, stable_seconds=stable_seconds)
+
+        def show(event):
+            typer.echo(
+                event.model_dump_json()
+                if as_json
+                else f"{event.status.upper():<8} {event.source!r}: {event.detail}"
+                + (f" [{event.book_id[:12]}]" if event.book_id else "")
+            )
+
+        if watch:
+            if not as_json:
+                typer.echo(f"Watching {processor.directory}. Stop with Ctrl+C.")
+            try:
+                while True:
+                    for event in processor.scan():
+                        show(event)
+                    sleep(interval)
+            except KeyboardInterrupt:
+                if not as_json:
+                    typer.echo("Stopped watching.")
+        else:
+            events = processor.batch()
+            if as_json:
+                typer.echo(
+                    json.dumps(
+                        {
+                            "directory": str(processor.directory),
+                            "events": [event.model_dump() for event in events],
+                        }
+                    )
+                )
+            else:
+                for event in events:
+                    show(event)
+                if not events:
+                    typer.echo("No new EPUB activity in this inbox.")
+            if any(event.status in {"waiting", "blocked", "busy", "error"} for event in events):
+                raise typer.Exit(1)
     except (ValueError, OSError) as exc:
         fail(exc)
 

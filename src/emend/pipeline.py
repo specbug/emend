@@ -1,7 +1,9 @@
 import os
+import re
 import shutil
 import tempfile
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 
 from emend import ENGINE_VERSION
@@ -11,6 +13,31 @@ from emend.models import Gate, Report
 from emend.reports import write_reports
 from emend.storage import Store, now
 from emend.validation import validate_ace, validate_epubcheck
+
+
+@dataclass(frozen=True)
+class KnownBook:
+    book_id: str
+    source_sha256: str
+
+
+def known_book(store: Store, digest: str) -> KnownBook | None:
+    """Called under the operation lock, including retained edited revisions."""
+    with store.db() as db:
+        row = db.execute("SELECT id FROM books WHERE id=?", (digest,)).fetchone()
+    root = store.root
+    if (
+        row
+        or (root / "curated" / f"{digest}.epub").exists()
+        or (root / "versions" / digest).exists()
+    ):
+        return KnownBook(digest, digest)
+    versions = root / "versions"
+    if versions.is_dir():
+        for book in versions.iterdir():
+            if re.fullmatch(r"[a-f0-9]{64}", book.name) and (book / f"{digest}.epub").exists():
+                return KnownBook(book.name, digest)
+    return None
 
 
 def atomic_copy(source: Path, target: Path):
@@ -30,6 +57,17 @@ def atomic_copy(source: Path, target: Path):
 
 
 def ingest(source: Path, config: Config) -> Report:
+    result = _ingest(source, config, only_new=False)
+    assert isinstance(result, Report)
+    return result
+
+
+def ingest_new(source: Path, config: Config) -> Report | KnownBook:
+    """Import only an unknown original; the duplicate check shares the write lock."""
+    return _ingest(source, config, only_new=True)
+
+
+def _ingest(source: Path, config: Config, *, only_new: bool) -> Report | KnownBook:
     source = source.expanduser().resolve()
     if not source.is_file():
         raise ValueError(f"EPUB not found: {source}")
@@ -49,6 +87,9 @@ def ingest(source: Path, config: Config) -> Report:
                         raise ValueError("Input grew beyond the configured archive size limit.")
                     dest.write(chunk)
             book_id = sha256_file(snapshot)
+            if only_new:
+                if known := known_book(store, book_id):
+                    return known
             original = config.root / "originals" / f"{book_id}.epub"
             if original.exists():
                 if sha256_file(original) != book_id:

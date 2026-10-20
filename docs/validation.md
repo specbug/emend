@@ -126,3 +126,11 @@ Set `EMEND_CALIBRE_DIR` to install elsewhere; set a writable `UV_CACHE_DIR` wher
 ## Report presentation
 
 The user supplied `Rishit Design Skill.skill` during implementation. Its relevant guidance informed the report: role-specific typography, an 8-pixel spacing rhythm, warm neutral OKLCH colors, hairline separators, bounded reading width, and explicit line heights. DM Sans and IBM Plex Mono are embedded with their licenses; the display serif uses a local font stack. Reports make no network requests and run no scripts. Publisher EPUB formatting remains unchanged. The report was rendered in Chromium at desktop and mobile widths and checked for horizontal overflow.
+
+## Safe EPUB inbox (0.8)
+
+The suite contains **304 cases**. Local validation passes **299**, including real EPUBCheck, Chromium, Calibre, and a foreground watcher subprocess. Five full Ace CLI cases remain explicitly skipped locally because of the managed browser restriction and run in hosted CI.
+
+The 34 new cases cover stable observations, changing/replaced/disappearing files, `.part` rename completion, bounded copies and entry counts, ignored symlinks/FIFOs, lock contention/retry, independent per-file errors, restart/rename deduplication, and CLI JSON/status behavior. Tests exercise both injected and actual mid-read changes, atomic duplicate checks across concurrent curation, preserved metadata/history, retained edited-revision recognition, orphaned artifacts, failed/pending imports, and unchanged manual-ingest behavior. One subprocess runs the real foreground watcher, imports a fixture, stops cleanly on SIGINT, then recognizes a renamed duplicate without changing its report. The official EPUBCheck case validates a new inbox import.
+
+Stability is inferred from filesystem observations; it does not establish that another program has closed the file. Prefer a temporary extension followed by rename after completion. Watching remains a synchronous foreground command, not a durable scheduler or automatic publication service. No personal EPUBs were used in these regression cases.
