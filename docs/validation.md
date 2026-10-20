@@ -92,9 +92,30 @@ The managed cloud Chromium rejects Ace's required `file:` navigation with `ERR_B
 
 The quality report was rendered and visually checked at 1280 px and 390 px with no horizontal overflow. Lint, formatting, wheel/sdist builds, and the optional CLI installation script pass. Emend's report runs no scripts or network requests; the separate raw DAISY report is retained as tool evidence.
 
+## Real Calibre CLI integration — 2026-10-20
+
+Installed the official Linux x86_64 Calibre 9.16.0 distribution from its GitHub release without root or Homebrew. The archive SHA-256 matches the release asset digest (`03cd4fda43de23d65405a3c90b924bc4a5c84753e388589d4ca343d9ba561a1d`). `calibredb`, `ebook-meta`, `ebook-convert`, and `calibre-debug` run successfully with isolated writable configuration and Qt's offscreen platform.
+
+Three repeatable integration cases use actual Calibre databases initialized by its CLI:
+
+- EPUB 2/3 publishing: original and explicitly curated metadata/cover revisions coexist with distinct Emend identifiers. Calibre stores the exact approved EPUB bytes, edited publisher/date/language, and the expected cover dimensions. Receipted retries and reconciliation without a receipt avoid duplicates. An altered destination EPUB is rejected by hash verification.
+- Full rich-library round-trip: Calibre creates a custom reading-status column, rich HTML comments, Unicode values, tags, series/index, and rating. Its converter produces a real TXT companion to the EPUB. Its Python API creates an author note with a resource attachment, a viewer highlight with notes, and a supplementary data file. Calibre also generates per-book metadata OPFs. The notes live in `.calnotes` in this release.
+- Emend backs up this closed library, verifies every archived file, transfers the archive with the real rclone local backend, and restores it into a new folder. The restored file inventory matches all hashes, modes, sizes, and modification times before reopening. Calibre then reads every rich field, annotation, note/resource hash, and format back identically, lists the library successfully, and reports no filesystem issues through `check_library --csv`.
+
+The fixture helper uses Calibre's own API only to set up/read test data; Emend continues to use the CLI for publishing and never writes Calibre metadata directly. No application fix was needed. The full local suite passes **265 tests**, with five Ace CLI cases explicitly skipped for hosted CI. These Linux checks use original synthetic EPUBs and a disposable real library; the target Mac, GUI presentation, a large personal library, and authenticated Google Drive remain unverified.
+
+Reproduce on Linux x86_64:
+
+```sh
+bash scripts/setup-calibre.sh
+EMEND_TEST_CALIBRE_BIN=/workspace/.tools/calibre-9.16.0 uv run pytest -q tests/test_calibre_integration.py
+```
+
+Set `EMEND_CALIBRE_DIR` to install elsewhere; set a writable `UV_CACHE_DIR` where needed. On another platform, point `EMEND_TEST_CALIBRE_BIN` at an existing Calibre binary directory. The tests isolate Calibre configuration and use disposable libraries. rclone transfer is additionally exercised when rclone is installed; hosted Linux CI installs it explicitly. The macOS job skips these three cases until given a real installation.
+
 ## Remaining integration checks
 
-- The target Mac mini M4 was not accessible. Calibre's macOS executable detection and command arguments are implemented; the argument/JSON formats were cross-checked against upstream Calibre source. A real Calibre import and opening a restored library still need verification on the Mac.
+- The target Mac mini M4 was not accessible. Real Calibre CLI import and rich-library restoration are now verified on Linux as above; macOS executable detection, platform-specific behavior, and GUI opening still need checks on the Mac.
 - No personal Google Drive account was connected or uploaded to. rclone upload behavior is tested at the process boundary; the user must configure and verify the actual remote locally.
 - Ace is optional. Structured parser/process fixtures and hosted official-CLI checks are described above; broader real-book and manual screen-reader validation remains outstanding. Reports show the tool as unavailable when it is absent.
 - The foundation and initial metadata-curation commits passed hosted macOS and Linux CI. Meta review checks are tracked on PR #2.
