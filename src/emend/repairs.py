@@ -28,6 +28,10 @@ DESCRIPTION = (
 )
 
 
+class RepairRejectedError(ValueError):
+    """A candidate failed required quality gates; the current book is unchanged."""
+
+
 class ContainerState(BaseModel):
     model_config = ConfigDict(extra="forbid")
     position: int = Field(ge=1)
@@ -318,7 +322,7 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
                 )
                 path = write_reports(report, directory)
                 if failures:
-                    raise ValueError(
+                    raise RepairRejectedError(
                         f"Repair candidate rejected; previous book retained. Evidence: {path}"
                     )
                 version = versions / f"{report.artifact_sha256}.epub"

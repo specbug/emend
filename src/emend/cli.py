@@ -231,11 +231,14 @@ def apply_repairs_command(
     as_json: Annotated[bool, typer.Option("--json")] = False,
 ):
     """Apply explicitly approved repairs, validate, and retain the previous book on failure."""
-    from emend.repairs import apply_repairs
+    from emend.repairs import RepairRejectedError, apply_repairs
 
     try:
         result = apply_repairs(book_id, load_config(config), plan_id=plan, approve=approve)
         typer.echo(result.model_dump_json(indent=2) if as_json else report_text(result))
+    except RepairRejectedError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
     except (ValueError, OSError) as exc:
         fail(exc)
 

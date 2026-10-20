@@ -252,6 +252,14 @@ def test_cli_json_and_required_approval(tmp_path, config):
     assert plan["actions"] == [ACTION]
     args = ["apply-repairs", before.book_id, "--plan", plan["id"], "-c", str(settings)]
     assert runner.invoke(app, args).exit_code == 2
+    original_tool = config.tools.epubcheck
+    config.tools.epubcheck = tmp_path / "unavailable"
+    settings.write_text(yaml.safe_dump(config.model_dump(mode="json")))
+    rejected = runner.invoke(app, [*args, "--approve", ACTION, "--json"])
+    assert rejected.exit_code == 1 and "candidate rejected" in rejected.output
+    assert get_report(Store(config.root), before.book_id) == before
+    config.tools.epubcheck = original_tool
+    settings.write_text(yaml.safe_dump(config.model_dump(mode="json")))
     result = runner.invoke(app, [*args, "--approve", ACTION, "--json"])
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["repair_changes"][0]["plan_id"] == plan["id"]
