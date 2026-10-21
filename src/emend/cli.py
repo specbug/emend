@@ -206,7 +206,7 @@ def repair_plan(
     config: ConfigOption = None,
     as_json: Annotated[bool, typer.Option("--json")] = False,
 ):
-    """Propose supported container repairs; leave the EPUB and approval unchanged."""
+    """Propose supported EPUB repairs; leave the EPUB and approval unchanged."""
     from emend.repairs import prepare_repairs
 
     try:

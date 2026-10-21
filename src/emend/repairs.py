@@ -1,4 +1,4 @@
-"""Explicit, fingerprinted container repairs; publication resource bytes stay intact."""
+"""Explicit, fingerprinted EPUB repairs with independently checked preservation."""
 
 import copy
 import html
@@ -14,6 +14,14 @@ from emend import ENGINE_VERSION
 from emend.config import Config
 from emend.inspect import inspect_epub, sha256_file
 from emend.models import Gate, RepairChange, Report
+from emend.navigation_repair import ACTION as NAV_ACTION
+from emend.navigation_repair import DESCRIPTION as NAV_DESCRIPTION
+from emend.navigation_repair import (
+    LinkRepair,
+    discover_links,
+    navigation_preserved,
+    rewrite_navigation,
+)
 from emend.pipeline import atomic_copy, get_report
 from emend.reports import report_styles, write_reports
 from emend.research.discovery import current_source
@@ -48,7 +56,8 @@ class RepairPlan(BaseModel):
     engine_version: str
     policy_sha256: str
     created_at: str
-    actions: list[Literal["container.mimetype"]]
+    actions: list[Literal["container.mimetype", "navigation.case_paths"]]
+    links: list[LinkRepair] = Field(default_factory=list)
     before: ContainerState | None = None
     after: ContainerState | None = None
     detail: str
@@ -72,8 +81,11 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
             if inspection.source_sha256 != digest or sha256_file(source) != digest:
                 raise ValueError("Current EPUB changed while preparing repairs.")
             actions = proposed_actions(inspection)
+            links = discover_links(current, inspection) if not actions else []
+            if links:
+                actions = [NAV_ACTION]
             before = None
-            if actions:
+            if ACTION in actions:
                 with zipfile.ZipFile(current) as archive:
                     mime = archive.getinfo("mimetype")
                     before = ContainerState(
@@ -92,11 +104,12 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
                 policy_sha256=config.policy_hash(),
                 created_at=now(),
                 actions=actions,
+                links=links,
                 before=before,
                 after=ContainerState(position=1, compression="stored", extra_bytes=0)
-                if actions
+                if ACTION in actions
                 else None,
-                detail=DESCRIPTION,
+                detail=NAV_DESCRIPTION if links else DESCRIPTION,
                 findings=[f"{f.code}: {f.message}"[:2000] for f in inspection.findings[:200]],
             )
         directory = config.root / "repairs" / row["id"] / plan.id
@@ -105,7 +118,7 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
         path.write_text(plan.model_dump_json(indent=2))
         esc = html.escape
         action = (
-            f"<p><code>{ACTION}</code>: {esc(DESCRIPTION)}</p>"
+            f"<p><code>{esc(plan.actions[0])}</code>: {esc(plan.detail)}</p>"
             if plan.actions
             else "<p>No supported repair. Other structural errors require manual review.</p>"
         )
@@ -117,13 +130,23 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
                 f"<li>ZIP extra field bytes: {plan.before.extra_bytes} → 0.</li>"
                 "</ul>"
             )
+        if plan.links:
+            action += (
+                "<h2>Proposed link changes</h2><ul>"
+                + "".join(
+                    f"<li><strong>{esc(link.document)}</strong><p>Current: <code>{esc(link.before)}</code></p>"
+                    f"<p>Proposed: <code>{esc(link.after)}</code></p><p>Existing target: <code>{esc(link.target)}</code></p></li>"
+                    for link in plan.links
+                )
+                + "</ul>"
+            )
         findings = "".join(f"<li>{esc(f)}</li>" for f in plan.findings)
         (directory / "review.html").write_text(
             '<!doctype html><html lang="en"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
-            f"<title>Container repair review</title><style>{report_styles()}</style></head>"
+            f"<title>EPUB repair review</title><style>{report_styles()}</style></head>"
             '<body><main><p class="brand">Emend · explicit repair review</p>'
-            f"<h1>Container repair</h1><p>{esc(row['source_name'])}</p>"
+            f"<h1>EPUB repair</h1><p><code>{esc(row['source_name'])}</code></p>"
             f"<p>Input SHA-256: <code>{digest}</code></p>{action}"
             "<p>This proposal has not changed the EPUB or its approval state. Applying requires "
             "explicit approval and fresh validation. Typography and reading content stay intact; "
@@ -194,7 +217,7 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
         row, source, digest = current_source(store, book_id, config)
         previous = get_report(store, row["id"])
         plan = load_repairs(store, row["id"], plan_id)
-        if set(approve) != {ACTION} or plan.actions != [ACTION]:
+        if not plan.actions or set(approve) != set(plan.actions):
             raise ValueError("Explicitly approve a supported action from emend repair-plan.")
         if plan.engine_version != ENGINE_VERSION or plan.policy_sha256 != config.policy_hash():
             raise ValueError("Repair policy or engine changed; prepare a new repair plan.")
@@ -225,17 +248,28 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
             current, candidate = Path(staging) / "current.epub", Path(staging) / "candidate.epub"
             snapshot(source, current, config.limits.max_archive_mb * 1024**2)
             baseline = inspect_epub(current, config.limits)
-            if baseline.source_sha256 != digest or proposed_actions(baseline) != plan.actions:
+            actions = proposed_actions(baseline)
+            links = discover_links(current, baseline) if not actions else []
+            if links:
+                actions = [NAV_ACTION]
+            if baseline.source_sha256 != digest or actions != plan.actions or links != plan.links:
                 raise ValueError("Current EPUB no longer matches the proposed repair.")
             atomic_copy(current, retained)
             replaced = False
             try:
-                rewrite_container(current, candidate)
+                if plan.actions == [ACTION]:
+                    rewrite_container(current, candidate)
+                else:
+                    rewrite_navigation(current, candidate, baseline, plan.links)
                 inspection = inspect_epub(candidate, config.limits)
                 preserved = (
                     not inspection.blocking
-                    and container_preserved(current, candidate)
-                    and inspection.resource_hashes == baseline.resource_hashes
+                    and (
+                        container_preserved(current, candidate)
+                        and inspection.resource_hashes == baseline.resource_hashes
+                        if plan.actions == [ACTION]
+                        else navigation_preserved(current, candidate, baseline, plan.links)
+                    )
                     and inspection.metadata == baseline.metadata
                     and inspection.spine == baseline.spine
                     and inspection.text_sha256 == baseline.text_sha256
@@ -246,13 +280,13 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
                         name="structure",
                         status="failed" if inspection.blocking else "passed",
                         required=True,
-                        detail="Repaired container inspected.",
+                        detail="Repaired EPUB inspected.",
                     ),
                     Gate(
                         name="preservation",
                         status="passed" if preserved else "failed",
                         required=True,
-                        detail="Every ZIP resource payload, reading text, metadata, and spine must match; only approved container packaging may change.",
+                        detail="Unrelated resource bytes, reading text, metadata and spine must match; only approved packaging or navigation attributes and the EPUB 3 modification timestamp may change.",
                     ),
                 ]
                 if preserved and not inspection.blocking:
@@ -308,12 +342,19 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
                         "artifact_sha256": inspection.source_sha256 if not failures else None,
                         "parent_artifact_sha256": digest,
                         "parent_report_path": row["report_path"],
-                        "changes": [*previous.changes, DESCRIPTION],
+                        "changes": [
+                            *previous.changes,
+                            plan.detail,
+                            *[
+                                f"{link.document} {link.attribute}: {link.before} → {link.after}. Plan: {plan.id}"
+                                for link in plan.links
+                            ],
+                        ],
                         "repair_changes": [
                             *previous.repair_changes,
                             RepairChange(
                                 plan_id=plan.id,
-                                action=ACTION,
+                                action=plan.actions[0],
                                 before_sha256=digest,
                                 after_sha256=inspection.source_sha256,
                             ),
@@ -337,7 +378,7 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
                     book_id,
                     row["source_name"],
                     "VALIDATED",
-                    f"Applied repair plan {plan.id}: {ACTION}",
+                    f"Applied repair plan {plan.id}: {', '.join(plan.actions)}",
                     path,
                     artifact,
                 )

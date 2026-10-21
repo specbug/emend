@@ -43,7 +43,9 @@ Version 0.5 adds `visual-review --layout paginated` for horizontal LTR reflowabl
 
 Version 0.9 adds fingerprinted repair proposals with before/after packaging details, a local HTML review, and explicit action approval. Its first action fixes the order/compression of an existing valid `mimetype` ZIP entry and clears that entry's extra fields. All resource payloads, reading content, metadata, and spine order remain unchanged; required validators run before activation. Failed candidates retain the previous book and report, and successful repairs retain revision/history records. Other structural defects and extra-field-only problems remain unsupported.
 
-Further work includes a broader structural-repair catalog, reviewed navigation/link repairs where intent can be established, and explicit typography proposals with visual comparisons. Those changes need their own preservation rules and corpus evidence; the container repair does not establish publication-quality layout.
+Version 0.10 adds reviewed case-only table-of-contents path repairs for EPUB 2 NCX and EPUB 3 navigation. It requires a unique existing XHTML spine target and an existing fragment, lists every proposed link change, and independently verifies the changed XML plus unchanged resources/text. Other navigation/body/footnote repairs remain unsupported.
+
+Further work includes a broader structural-repair catalog and explicit typography proposals with visual comparisons. Those changes need their own preservation rules and corpus evidence; the container repair does not establish publication-quality layout.
 
 ## Next: reader calibration and accessibility depth
 
