@@ -51,9 +51,11 @@ Keep reader compatibility claims tied to actual device evidence.
 
 - `inspect.py`, `pipeline.py`, `storage.py`, `models.py`: inspection, preserved
   artifacts, lifecycle state, and saved evidence models.
-- `repairs.py`: explicit container repair plans, independent payload preservation,
-  validator gates, and retained revisions. Carry `repair_changes` through later
-  edits; never apply repairs while preparing a plan.
+- `repairs.py`, `navigation_repair.py`: explicit packaging/navigation repair plans,
+  independent payload/XML preservation, validator gates, and retained revisions. Carry `repair_changes` through later
+  edits; never apply repairs while preparing a plan. Navigation repair must change
+  only the approved attributes and EPUB 3 modification timestamp, with independent
+  tree comparison and unchanged reading text/unrelated resource bytes.
 - `inbox.py`: stable-file batch/foreground ingestion. Always use the atomic
   `ingest_new` path for automation; ordinary `ingest` intentionally resets books.
 - `research/`, `curation.py`, `covers.py`, `cover_apply.py`: discovery, advice,

@@ -166,7 +166,7 @@ Validators receive a bounded temporary copy. Emend checks that copy and the stor
 
 In a revalidation report, `artifact_sha256` identifies the retained bytes **even when validation fails**. Approval requires `state: VALIDATED`, matching policy/engine, and passing required gates. Use `reset-original` or re-ingest an original only when you intend to discard that book's current curated edits.
 
-## Review and apply a container repair
+## Review and apply an EPUB repair
 
 A book rejected because its existing, correct `mimetype` entry is compressed or appears after other ZIP entries can now be repaired explicitly:
 
@@ -177,13 +177,27 @@ uv run emend repair-plan BOOK_ID --json
 uv run emend apply-repairs BOOK_ID --plan PLAN_ID --approve container.mimetype
 ```
 
-The plan records the current EPUB/report hashes, quality policy, inspection findings, and current/proposed entry position, compression, and ZIP extra-field size. Preparing it changes neither book bytes nor approval. Plans live under `~/Emend/repairs/BOOK_ID/PLAN_ID/`; a changed book, report, policy, or engine requires a new plan. `--approve` is mandatory, and `--plan` selects the exact saved proposal.
+The plan records the current EPUB/report hashes, quality policy, and inspection findings. It shows current/proposed packaging details for container repairs, or each old/new link and its existing target for navigation repairs. Preparing it changes neither book bytes nor approval. Plans live under `~/Emend/repairs/BOOK_ID/PLAN_ID/`; a changed book, report, policy, or engine requires a new plan. `--approve` is mandatory, and `--plan` selects the exact saved proposal.
 
-This first repair moves the existing `mimetype` entry first, stores it uncompressed, and removes its ZIP extra fields. **Every resource payload stays byte-identical**, including OPF metadata, XHTML, CSS, images, fonts, unmanifested files, and directory records. Other entries retain their relative order, compression, timestamps, extra fields, and comments; the archive comment is retained. ZIP compression/header bytes may differ, so the repaired EPUB has a new hash. Original bytes and pre/post repair revisions are retained.
+The `container.mimetype` action moves the existing `mimetype` entry first, stores it uncompressed, and removes its ZIP extra fields. **Every resource payload stays byte-identical**, including OPF metadata, XHTML, CSS, images, fonts, unmanifested files, and directory records. Other entries retain their relative order, compression, timestamps, extra fields, and comments; the archive comment is retained. ZIP compression/header bytes may differ, so the repaired EPUB has a new hash. Original bytes and pre/post repair revisions are retained.
 
-Only the built-in `zip.mimetype_order` error is supported, with no other structural errors. Missing/incorrect mimetype content, unsafe/duplicate entries, encryption problems, malformed XML, and other defects require manual review and receive no supported action. An extra-field-only defect is not yet detected/proposed by this workflow. It does not repair typography, text, navigation, or missing resources.
+The container action supports only the built-in `zip.mimetype_order` error, with no other structural errors. Missing/incorrect mimetype content, unsafe/duplicate entries, encryption problems, malformed XML, and other defects require manual review and receive no supported action. An extra-field-only defect is not yet detected/proposed by this workflow. It does not repair typography, text, navigation, or missing resources; the separate navigation action below handles one specific link defect.
 
 Applying checks preservation independently and runs the configured validators before activating the candidate. Failure keeps the previous book, report, and approval state, while saving rejection evidence. Repair history survives subsequent metadata/cover edits and revalidation. Repeating a successful application is idempotent; it cannot clear later failed/pending gates—use `revalidate` for those. Publishing the repaired revision remains explicit. The apply command exits `1` for rejected quality gates and `2` for invalid requests or operational errors.
+
+The `navigation.case_paths` action fixes case-only resource paths in the declared EPUB 2 NCX or EPUB 3 table of contents:
+
+```sh
+uv run emend repair-plan BOOK_ID
+# Inspect each old/new link in review.html before approving this action.
+uv run emend apply-repairs BOOK_ID --plan PLAN_ID --approve navigation.case_paths
+```
+
+For example, `CHAPTER.xhtml#start` can become `chapter.xhtml#start` when there is exactly one matching archive path, that path is an XHTML spine document, and `start` exists. Fragment spelling/encoding and link labels stay unchanged. Up to 200 fixes can be approved together; the plan lists every one. A candidate must fix all structural errors. This version does not combine container and navigation actions in one plan.
+
+Ambiguous case collisions, nonexistent resources/fragments, fragment-case mistakes, query strings, broken body/footnote links, non-spine destinations, unsupported XML, and other damage get no navigation proposal. External links are left alone. Each link/document/target value is limited to 2,000 UTF-8 bytes. Emend neither guesses chapters from titles nor generates new IDs.
+
+Navigation repair changes only the listed XML link attributes and EPUB 3's modification timestamp. Independent XML comparisons include labels, comments, processing instructions, namespaces, doctype, and unrelated attributes/text; every other resource stays byte-identical. Changed XML documents are serialized as UTF-8, so declaration/formatting bytes may differ. Reading text, OPF descriptive metadata, styles, images, and spine order are retained. These repairs do not certify reading order, footnote behavior, typography, or device compatibility.
 
 Rollback is tested for application errors, including a database failure after artifact replacement. Machine/power-loss durability and forced interruption during replacement are not established; a byte/report mismatch blocks further use and requires recovery from the retained revision. These checks establish container preservation and standards validation, not visual quality or reader compatibility.
 
