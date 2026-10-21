@@ -79,6 +79,13 @@ class CoverChange(BaseModel):
     allowed_aspect_change: bool = False
 
 
+class RepairChange(BaseModel):
+    plan_id: str
+    action: str
+    before_sha256: str
+    after_sha256: str
+
+
 class Report(BaseModel):
     book_id: str
     source_name: str
@@ -92,6 +99,7 @@ class Report(BaseModel):
     # always requires the state, policy, and required gates to pass as well.
     artifact_sha256: str | None = None
     revalidation: bool = False
+    repair_changes: list[RepairChange] = Field(default_factory=list)
     changes: list[str] = Field(default_factory=list)
     metadata_changes: list[MetadataChange] = Field(default_factory=list)
     research_plan_id: str | None = None

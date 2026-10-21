@@ -166,6 +166,27 @@ Validators receive a bounded temporary copy. Emend checks that copy and the stor
 
 In a revalidation report, `artifact_sha256` identifies the retained bytes **even when validation fails**. Approval requires `state: VALIDATED`, matching policy/engine, and passing required gates. Use `reset-original` or re-ingest an original only when you intend to discard that book's current curated edits.
 
+## Review and apply a container repair
+
+A book rejected because its existing, correct `mimetype` entry is compressed or appears after other ZIP entries can now be repaired explicitly:
+
+```sh
+uv run emend repair-plan BOOK_ID
+uv run emend repair-plan BOOK_ID --json
+# Open the reported review.html and inspect the proposed packaging changes.
+uv run emend apply-repairs BOOK_ID --plan PLAN_ID --approve container.mimetype
+```
+
+The plan records the current EPUB/report hashes, quality policy, inspection findings, and current/proposed entry position, compression, and ZIP extra-field size. Preparing it changes neither book bytes nor approval. Plans live under `~/Emend/repairs/BOOK_ID/PLAN_ID/`; a changed book, report, policy, or engine requires a new plan. `--approve` is mandatory, and `--plan` selects the exact saved proposal.
+
+This first repair moves the existing `mimetype` entry first, stores it uncompressed, and removes its ZIP extra fields. **Every resource payload stays byte-identical**, including OPF metadata, XHTML, CSS, images, fonts, unmanifested files, and directory records. Other entries retain their relative order, compression, timestamps, extra fields, and comments; the archive comment is retained. ZIP compression/header bytes may differ, so the repaired EPUB has a new hash. Original bytes and pre/post repair revisions are retained.
+
+Only the built-in `zip.mimetype_order` error is supported, with no other structural errors. Missing/incorrect mimetype content, unsafe/duplicate entries, encryption problems, malformed XML, and other defects require manual review and receive no supported action. An extra-field-only defect is not yet detected/proposed by this workflow. It does not repair typography, text, navigation, or missing resources.
+
+Applying checks preservation independently and runs the configured validators before activating the candidate. Failure keeps the previous book, report, and approval state, while saving rejection evidence. Repair history survives subsequent metadata/cover edits and revalidation. Repeating a successful application is idempotent; it cannot clear later failed/pending gates—use `revalidate` for those. Publishing the repaired revision remains explicit. The apply command exits `1` for rejected quality gates and `2` for invalid requests or operational errors.
+
+Rollback is tested for application errors, including a database failure after artifact replacement. Machine/power-loss durability and forced interruption during replacement are not established; a byte/report mismatch blocks further use and requires recovery from the retained revision. These checks establish container preservation and standards validation, not visual quality or reader compatibility.
+
 ## Discover editions when an EPUB has no ISBN
 
 The edition/cover workflow passes preservation, rollback, and official EPUBCheck tests, with live Open Library checks. See [validation evidence](docs/validation.md) and [remaining integration checks](docs/deferred-validation.md).
