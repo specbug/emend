@@ -837,12 +837,18 @@ def review_workspace(
         int, typer.Option(min=0, max=65535, help="Local port; zero selects an available port.")
     ] = 8765,
     config: ConfigOption = None,
+    reader_directory: Annotated[
+        Path | None,
+        typer.Option(
+            help="Existing mounted-reader folder; optional explicit delivery destination."
+        ),
+    ] = None,
 ):
     """Open a local authenticated workspace for inspecting and explicitly approving changes."""
     from emend.review_ui import ReviewServer
 
     try:
-        with ReviewServer(load_config(config), port) as server:
+        with ReviewServer(load_config(config), port, reader_directory=reader_directory) as server:
             typer.echo(
                 f"Open this local session URL in your browser:\n{server.entry_url}\nKeep this URL private. Stop the server with Ctrl+C."
             )
@@ -850,6 +856,26 @@ def review_workspace(
                 server.serve_forever(poll_interval=0.2)
             except KeyboardInterrupt:
                 typer.echo("Review session stopped.")
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("export-reader")
+def export_reader_command(
+    book_id: str,
+    to: Annotated[Path, typer.Option("--to", help="Existing mounted-reader folder.")],
+    filename: str | None = None,
+    config: ConfigOption = None,
+):
+    """Export verified approved EPUB bytes to a reader folder without overwriting files."""
+    from emend.reader_export import ReaderDeliveryError, export_reader
+
+    try:
+        result = export_reader(book_id, to, load_config(config), filename=filename)
+        typer.echo(json.dumps(result, indent=2))
+    except ReaderDeliveryError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
     except (ValueError, OSError) as exc:
         fail(exc)
 

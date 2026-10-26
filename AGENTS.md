@@ -74,6 +74,9 @@ Keep reader compatibility claims tied to actual device evidence.
   checks, bounded uploads, isolated evidence, and core mutation gates. GET must
   never trigger edits, provider calls, publishing or other user actions.
 - `reports.py`, `library.py`, `assets/`, `cli.py`: local reports, overview, and CLI.
+- `reader_export.py`: byte-verified mounted-folder delivery. Keep native atomic
+  no-clobber behavior, directory-descriptor checks, retry reconciliation and
+  shared publication gates; never replace unknown files or infer device support.
 - `publish.py`, `backup.py`: delivery and full-library backup/restore.
 - Paths above are relative to `src/emend/`. `tests/epub_factory.py` supplies small
   original EPUB fixtures; use those for reproducible regression cases.
