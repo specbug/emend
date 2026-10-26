@@ -58,6 +58,20 @@ publish:
 
 Keep the other generated settings, or omit them to use their defaults. Paths can use `~`; relative paths resolve beside the configuration file. Unknown settings are rejected to catch typos. An alternative config can be passed with `--config PATH` on each command or selected with `EMEND_CONFIG`.
 
+## Open the local review workspace
+
+```sh
+uv sync --frozen --extra visual
+uv run --extra visual playwright install chromium
+uv run emend review
+```
+
+Open the session URL printed in the terminal. The workspace binds only to `127.0.0.1`; keep that URL private and stop the server with Ctrl+C. Use `--port 0` to select an available port. No separate web account or subscription is needed.
+
+Import an EPUB (up to 64 MiB here; use the inbox/CLI for larger books), inspect current quality gates, research/select metadata and editions, compare/apply covers, prepare/apply supported repairs, compare/apply typography, and open visual/reading evidence. Each edit/publishing action is explicit and uses the same integrity/approval checks as the CLI. Local JPEG/PNG cover uploads accept a provenance note and are bounded to 20 MiB. Known EPUB uploads leave existing curated books unchanged.
+
+Configured Calibre/Drive destinations appear as publishing actions. Complete Calibre backups require confirming that Calibre and other writers are closed. Long checks/transfers may take minutes; let the submitted action finish before retrying. The workspace rejects stale forms, isolates saved reports, and checks local-session/CSRF/origin evidence before actions. It serves registered review evidence, not arbitrary files or EPUB scripts. The CLI remains available for recovery and advanced inspection.
+
 ## Inspect and import an EPUB
 
 ```sh
