@@ -86,6 +86,16 @@ class RepairChange(BaseModel):
     after_sha256: str
 
 
+class TypographyChange(BaseModel):
+    trial_id: str
+    css_sha256: str
+    resource_path: str
+    documents: list[str]
+    all_spine: bool = False
+    before_sha256: str
+    after_sha256: str
+
+
 class Report(BaseModel):
     book_id: str
     source_name: str
@@ -100,6 +110,7 @@ class Report(BaseModel):
     artifact_sha256: str | None = None
     revalidation: bool = False
     repair_changes: list[RepairChange] = Field(default_factory=list)
+    typography_changes: list[TypographyChange] = Field(default_factory=list)
     changes: list[str] = Field(default_factory=list)
     metadata_changes: list[MetadataChange] = Field(default_factory=list)
     research_plan_id: str | None = None

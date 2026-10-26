@@ -291,7 +291,21 @@ Open the reported `trial.html` for current/trial screenshots from the **same ver
 
 The default samples up to three representative documents at compact/wide sizes; `--max-documents` accepts 1–9. Both scrolling and paginated previews retain their existing limitations. Each view samples its own document start/middle/end: different flow may change sampled text/page counts. These are not line-aligned comparisons or reader emulation. Each capture retains its own bounded time/screenshot budget, up to two renderer budgets overall.
 
-Trials live under `~/Emend/typography/BOOK_ID/TRIAL_ID/` with numeric settings, the exact generated CSS, and hashed before/after screenshots. `typography-trials --trial TRIAL_ID` verifies saved evidence without launching the browser; it exits `1` for stale/incomplete evidence and `2` for invalid or altered inputs. A later EPUB edit requires a new trial. Creating a trial leaves book bytes, reports, approval, and publishing unchanged; it does not apply CSS to the EPUB.
+Trials live under `~/Emend/typography/BOOK_ID/TRIAL_ID/` with numeric settings, the exact generated CSS, and hashed before/after screenshots. `typography-trials --trial TRIAL_ID` verifies saved evidence without launching the browser; it exits `1` for stale/incomplete evidence and `2` for invalid or altered inputs. A later EPUB edit requires a new trial. Creating a trial leaves book bytes, reports, approval, and publishing unchanged; it does not apply CSS to the EPUB. The separate `apply-typography` command below requires explicit review/approval.
+
+## Apply a reviewed typography trial
+
+```sh
+uv run emend apply-typography BOOK_ID --trial TRIAL_ID --approve
+# Optional, broader scope after reviewing special content:
+uv run emend apply-typography BOOK_ID --trial TRIAL_ID --approve --all-spine
+```
+
+The default edits only the documents sampled in the named trial. `--all-spine` explicitly extends the same CSS to all XHTML spine documents, including unsampled chapters; review verse, tables, captions and notes first. A complete, intact trial for the current artifact and a validated current book are required. Typography choices are personal/editorial decisions; Emend does not certify them as improvements.
+
+Application adds the exact trial CSS as a manifest resource, appends stylesheet links to approved XHTML heads, and updates the EPUB 3 modification timestamp. It independently checks the XML trees and resource inventory: reading text, labels, fonts, images, existing CSS, metadata and spine order must remain unchanged. Existing stylesheets remain available; the new numeric rules participate in the CSS cascade exactly as in the trial. A different trial can layer further changes; `reset-original` restores original bytes and clears active edits after explicit review.
+
+Required validators run before activation. Rejected candidates preserve the previous artifact/report and retain evidence. Originals and pre/post revisions remain available; application errors roll back, including database/copy failure after replacement. Repeating the same successful trial/scope is idempotent. Typography history survives later metadata edits, cover changes, repairs and revalidation. Changed artifact hashes make earlier visual/metadata proposals stale. Publishing remains explicit. Forced-interruption/power-loss durability during activation remains a separate validation task.
 
 ## Ask Meta to review uncertain metadata
 
