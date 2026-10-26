@@ -132,7 +132,9 @@ def target_key(target: str, config: Config) -> str:
     return target + ":" + hashlib.sha256(str(destination).encode()).hexdigest()
 
 
-def publish(book_id: str, targets: list[str], config: Config) -> dict:
+def publish(
+    book_id: str, targets: list[str], config: Config, *, expected_artifact_sha256: str | None = None
+) -> dict:
     if not targets or any(target not in {"calibre", "drive"} for target in targets):
         raise ValueError("Select at least one supported target: calibre or drive.")
     store = Store(config.root)
@@ -141,6 +143,11 @@ def publish(book_id: str, targets: list[str], config: Config) -> dict:
         row = store.resolve(book_id)
         book_id = row["id"]
         report = get_report(store, book_id)
+        if (
+            expected_artifact_sha256 is not None
+            and report.artifact_sha256 != expected_artifact_sha256
+        ):
+            raise ValueError("Publication page is stale; review the current artifact first.")
         if row["state"] not in {"VALIDATED", "PUBLISHED"} or report.state != "VALIDATED":
             raise ValueError("Publication blocked: this book has not passed its required gates.")
         if report.policy_sha256 != config.policy_hash() or report.engine_version != ENGINE_VERSION:

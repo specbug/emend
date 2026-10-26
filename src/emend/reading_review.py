@@ -437,7 +437,7 @@ def write_html(review, directory):
         for f in review.fonts
     )
     notes = "".join(
-        f"<li><code>{esc(n.document)} → {esc(n.href)}</code><p>Explicit note semantics: {n.semantic_note}. Reciprocal backlink: {n.reciprocal_backlink}.</p></li>"
+        f"<li><code>{esc(n.document)} → {esc(n.href)}</code><p>Explicit note semantics: {'present' if n.semantic_note else 'not found'}. Reciprocal backlink: {'found' if n.reciprocal_backlink else 'not found'}.</p></li>"
         for n in review.notes
     )
     findings = "".join(
