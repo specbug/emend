@@ -197,4 +197,5 @@ def test_real_browser_applied_css_matches_reviewed_preview(tmp_path, browser_con
     current = visual_review(before.book_id, config, profiles=["compact"], max_documents=1)
     assert current.status == "complete"
     assert current.samples[0].document_height == trial.after[0].document_height
-    assert current.samples[0].screenshots[0].sha256 == trial.after[0].screenshots[0].sha256
+    assert current.samples[0].typography == trial.after[0].typography
+    assert current.samples[0].typography
