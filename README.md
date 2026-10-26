@@ -307,6 +307,17 @@ Application adds the exact trial CSS as a manifest resource, appends stylesheet 
 
 Required validators run before activation. Rejected candidates preserve the previous artifact/report and retain evidence. Originals and pre/post revisions remain available; application errors roll back, including database/copy failure after replacement. Repeating the same successful trial/scope is idempotent. Typography history survives later metadata edits, cover changes, repairs and revalidation. Changed artifact hashes make earlier visual/metadata proposals stale. Publishing remains explicit. Forced-interruption/power-loss durability during activation remains a separate validation task.
 
+## Review fonts, notes and reading direction
+
+```sh
+uv run emend reading-review BOOK_ID
+uv run emend reading-review BOOK_ID --show --json
+```
+
+This offline, advisory review records manifest font bytes/hashes, discovered font-face sources (including nested/inline styles), declared obfuscation, document language/direction, and explicitly marked note references. It looks for an existing target and a reciprocal backlink inside the note region; missing semantics/backlinks remain visible for manual inspection. Ordinary unmarked links are not guessed to be notes. Direction declarations are source hints, not a resolved CSS cascade.
+
+The report changes no EPUB bytes, approval or publication state. It does not establish glyph coverage, real font loading, screen-reader conformance, footnote popup behavior, or device compatibility. Inspection is bounded to 1,000 XHTML documents, 200 fonts and 5,000 marked references; hitting a bound marks the evidence incomplete. Saved JSON is capped at 8 MiB and verified when reopened. `--show`/`--review ID` reads saved evidence without rescanning; stale/incomplete evidence exits `1` and altered/invalid input exits `2`.
+
 ## Ask Meta to review uncertain metadata
 
 After `research`, use [Meta Model API](https://dev.meta.ai/products/meta-model-api) for advice on proposals marked `review`:

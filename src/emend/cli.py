@@ -797,6 +797,40 @@ def typography_trials_command(
         fail(exc)
 
 
+@app.command("reading-review")
+def reading_review_command(
+    book_id: str,
+    show: Annotated[bool, typer.Option(help="Verify saved evidence without rescanning.")] = False,
+    review: str | None = None,
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Inspect fonts, marked footnotes and reading direction without changing the book."""
+    from emend.reading_review import load_reading_review, reading_review
+    from emend.research.discovery import current_source
+
+    try:
+        settings = load_config(config)
+        store = Store(settings.root)
+        row, _, digest = current_source(store, book_id, settings)
+        result = (
+            load_reading_review(store, row["id"], review)
+            if show or review
+            else reading_review(row["id"], settings)
+        )
+        current = result.artifact_sha256 == digest
+        path = store.document(row["id"], "reading-review", result.id)["path"]
+        typer.echo(
+            json.dumps({"current_artifact": current, "review": result.model_dump()}, indent=2)
+            if as_json
+            else f"Reading review {result.id}: {'complete' if result.complete else 'incomplete'}\nArtifact: {'current' if current else 'STALE'}\nOpen: {Path(path).with_suffix('.html')}\nAdvisory findings: {len(result.findings)}; no conformance certification."
+        )
+        if not current or not result.complete:
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 @app.command("library")
 def library_command(
     config: ConfigOption = None,
