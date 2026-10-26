@@ -581,6 +581,26 @@ def apply_cover_command(
         fail(exc)
 
 
+@app.command("create-cover")
+def create_cover_command(
+    book_id: str,
+    review: Annotated[str, typer.Option(help="Saved missing-cover review ID.")],
+    approve: Annotated[str, typer.Option(help="Explicitly approved candidate ID.")],
+    config: ConfigOption = None,
+    allow_small: bool = False,
+):
+    """Add a reviewed image and cover page to a reflowable EPUB with no cover."""
+    from emend.cover_create import create_cover
+
+    try:
+        result = create_cover(
+            book_id, load_config(config), review_id=review, approve=approve, allow_small=allow_small
+        )
+        typer.echo(report_text(result))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 @app.command("apply")
 def apply_command(
     book_id: str,

@@ -165,6 +165,10 @@ def write_reports(report: Report, directory: Path) -> Path:
         f"<li><strong>Cover image</strong><p>{c.before_dimensions[0]} × {c.before_dimensions[1]} → {c.after_dimensions[0]} × {c.after_dimensions[1]} px</p><p>{esc(c.source)}</p><code>{esc(c.after_sha256)}</code></li>"
         for c in report.cover_changes
     )
+    cover_changes += "".join(
+        f"<li>Created missing cover: {esc(c.image_path)} and {esc(c.page_path)}. Source: {esc(c.source)}; image SHA-256 {esc(c.image_sha256)}. Small-source exception: {c.allowed_small}.</li>"
+        for c in report.cover_additions
+    )
     cover_section = f"<h2>Cover changes</h2><ul>{cover_changes}</ul>" if cover_changes else ""
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

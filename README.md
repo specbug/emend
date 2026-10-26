@@ -487,3 +487,21 @@ EMEND_TEST_CALIBRE_BIN=/workspace/.tools/calibre-9.17.0 uv run pytest -q tests/t
 Override `EMEND_CALIBRE_DIR` for another installation directory. On macOS, the tests can instead use an existing `/Applications/calibre.app/Contents/MacOS` directory. They isolate Calibre configuration and Qt runs offscreen. With rclone installed, the rich-library test also transfers its backup through a local backend before restoring it. Hosted Linux CI enables these checks; macOS CI explicitly skips them until given Calibre.
 
 Exit codes: `0` success; `1` blocked quality gates or pending publication/upload; `2` invalid configuration, input, or operational error. No automatic publication occurs merely by inspecting or ingesting a book.
+
+### Creating a missing cover
+
+After `cover-review BOOK --image cover.png --source-note "Artwork provenance"`,
+inspect the saved comparison, then explicitly approve its candidate:
+
+```sh
+emend create-cover BOOK --review REVIEW_ID --approve CANDIDATE_ID --config emend.yaml
+```
+
+This supports reflowable EPUB 2/3 with no declared cover or existing cover-page
+hints. It adds the approved JPEG/PNG unchanged and a proportional cover page at
+the front of the spine, preserving all existing resource bytes and their relative
+reading order. Required validators run before activation; failures retain the
+previous artifact. Sources below 600 pixels on their short edge require the
+recorded `--allow-small` exception after checking readability. No artwork is
+invented or matched automatically. Existing declared covers use `apply-cover`.
+Both operations are available in the local review workspace.

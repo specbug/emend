@@ -291,17 +291,24 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
                         '<p>Default: sampled documents only. Read the comparison and CSS first.</p><label><input type="checkbox" name="all_spine" value="yes">Extend to all XHTML spine documents, including unsampled chapters.</label>',
                         {"trial": evidence.id},
                     )
-                elif (
-                    current and kind == "cover-review" and evidence.original and evidence.candidates
-                ):
+                elif current and kind == "cover-review" and evidence.candidates:
                     choices = "".join(
                         f'<label><input type="radio" name="candidate" value="{esc(c.id)}" required>{esc(c.id)} · {c.width} × {c.height} · {esc(c.source)}</label>'
                         for c in evidence.candidates
                     )
                     choices += '<p>Exceptions below are recorded. Review image resolution and existing cover-page fit first.</p><label><input type="checkbox" name="allow_smaller" value="yes">Allow a smaller source image.</label><label><input type="checkbox" name="allow_aspect_change" value="yes">Allow an aspect-ratio change.</label>'
-                    body += form(
-                        "apply-cover", "Apply reviewed cover", choices, {"review": evidence.id}
-                    )
+                    if evidence.original:
+                        body += form(
+                            "apply-cover", "Apply reviewed cover", choices, {"review": evidence.id}
+                        )
+                    else:
+                        choices += '<p>No declared cover. Adds a new image and first cover page; existing reading resources stay unchanged. Existing cover hints and fixed layouts require manual repair.</p><label><input type="checkbox" name="allow_small" value="yes">Approve a source below 600 px on its short edge after checking readability.</label>'
+                        body += form(
+                            "create-cover",
+                            "Create reviewed missing cover",
+                            choices,
+                            {"review": evidence.id},
+                        )
             except (ValueError, OSError) as exc:
                 body += (
                     f'<p class="error">{esc(kind)} evidence unavailable: {esc(str(exc)[:500])}</p>'
@@ -439,7 +446,22 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             from emend.cover_apply import apply_cover
 
             apply_cover(
-                book, self.config, review_id=value(form, "review"), approve=value(form, "candidate")
+                book,
+                self.config,
+                review_id=value(form, "review"),
+                approve=value(form, "candidate"),
+                allow_smaller=value(form, "allow_smaller") == "yes",
+                allow_aspect_change=value(form, "allow_aspect_change") == "yes",
+            )
+        elif action == "create-cover":
+            from emend.cover_create import create_cover
+
+            create_cover(
+                book,
+                self.config,
+                review_id=value(form, "review"),
+                approve=value(form, "candidate"),
+                allow_small=value(form, "allow_small") == "yes",
             )
         elif action == "ai-review":
             from emend.research.ai_review import review_plan
