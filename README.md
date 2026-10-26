@@ -428,7 +428,7 @@ On Linux x86_64, install the checksum-verified official Calibre CLI and run thos
 
 ```sh
 bash scripts/setup-calibre.sh
-EMEND_TEST_CALIBRE_BIN=/workspace/.tools/calibre-9.16.0 uv run pytest -q tests/test_calibre_integration.py
+EMEND_TEST_CALIBRE_BIN=/workspace/.tools/calibre-9.17.0 uv run pytest -q tests/test_calibre_integration.py
 ```
 
 Override `EMEND_CALIBRE_DIR` for another installation directory. On macOS, the tests can instead use an existing `/Applications/calibre.app/Contents/MacOS` directory. They isolate Calibre configuration and Qt runs offscreen. With rclone installed, the rich-library test also transfers its backup through a local backend before restoring it. Hosted Linux CI enables these checks; macOS CI explicitly skips them until given Calibre.
