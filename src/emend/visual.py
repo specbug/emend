@@ -138,6 +138,7 @@ def render(
     *,
     layout: str = "scroll",
     page_margin: int = 40,
+    preview_css: str | None = None,
 ) -> tuple[str, list[Sample]]:
     validate_layout(layout, page_margin)
     try:
@@ -233,6 +234,18 @@ def render(
                             if navigation["rejected"]:
                                 raise ValueError(
                                     "Document attempted automatic navigation; sample is incomplete."
+                                )
+                            if preview_css:
+                                # XHTML style elements do not reliably dispatch the load
+                                # event awaited by add_style_tag. Insert trusted generated
+                                # CSS directly; book JavaScript remains disabled.
+                                page.evaluate(
+                                    """css => {
+                                    const style = document.createElementNS('http://www.w3.org/1999/xhtml', 'style');
+                                    style.textContent = css;
+                                    document.head.appendChild(style);
+                                }""",
+                                    preview_css,
                                 )
                             if layout == "paginated":
                                 pagination = paginate(page, width, height, page_margin)

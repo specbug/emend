@@ -691,6 +691,81 @@ def visuals_command(
         fail(exc)
 
 
+@app.command("typography-trial")
+def typography_trial_command(
+    book_id: str,
+    line_height: Annotated[
+        float | None, typer.Option(min=1, max=2.4, help="Trial body/p line height, unitless.")
+    ] = None,
+    paragraph_gap: Annotated[
+        float | None,
+        typer.Option(min=0, max=2, help="Trial p spacing in em; sets the before margin to zero."),
+    ] = None,
+    profile: Annotated[
+        list[str] | None, typer.Option(help="compact or wide; repeat for both.")
+    ] = None,
+    max_documents: Annotated[int, typer.Option(min=1, max=9)] = 3,
+    layout: Annotated[str, typer.Option(help="scroll or paginated.")] = "scroll",
+    page_margin: Annotated[int, typer.Option(min=16, max=120)] = 40,
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Compare chosen typography values in the browser; leave the EPUB unchanged."""
+    from emend.typography import TypographySettings, typography_trial
+
+    try:
+        settings = load_config(config)
+        values = TypographySettings(line_height=line_height, paragraph_gap=paragraph_gap)
+        trial = typography_trial(
+            book_id,
+            settings,
+            values,
+            profiles=profile,
+            max_documents=max_documents,
+            layout=layout,
+            page_margin=page_margin,
+        )
+        path = Store(settings.root).document(trial.book_id, "typography-trial", trial.id)["path"]
+        typer.echo(
+            trial.model_dump_json(indent=2)
+            if as_json
+            else f"Typography trial {trial.id}: {trial.status}\nOpen: {Path(path).with_suffix('.html')}\nEPUB and quality state unchanged."
+        )
+        if trial.status == "incomplete":
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("typography-trials")
+def typography_trials_command(
+    book_id: str,
+    trial: str | None = None,
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Verify a saved trial and flag comparisons from an earlier artifact."""
+    from emend.research.discovery import current_source
+    from emend.typography import load_trial
+
+    try:
+        settings = load_config(config)
+        store = Store(settings.root)
+        row, _, digest = current_source(store, book_id, settings)
+        result = load_trial(store, row["id"], trial)
+        current = result.artifact_sha256 == digest
+        path = store.document(row["id"], "typography-trial", result.id)["path"]
+        typer.echo(
+            json.dumps({"current_artifact": current, "trial": result.model_dump()}, indent=2)
+            if as_json
+            else f"Typography trial {result.id}: {result.status}\nArtifact: {'current' if current else 'STALE; capture a new trial'}\nOpen: {Path(path).with_suffix('.html')}"
+        )
+        if not current or result.status != "complete":
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 @app.command("library")
 def library_command(
     config: ConfigOption = None,
