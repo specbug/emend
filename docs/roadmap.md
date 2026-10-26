@@ -1,72 +1,56 @@
-# Scope and next milestones
+# Release scope and future work
 
-The first usable version follows the supplied Emend design's reliable-foundation milestone. The project, Python package, and CLI are all named `emend`.
+Emend's current milestone is a local, preservation-first EPUB review and curation
+workflow, with explicit edits, inspectable evidence, gated delivery and complete
+Calibre-library backups. Version 0.18 completes the planned implementation batch.
+The remaining release acceptance is PR review/merge and the personal Mac, Drive
+and XTEINK checks in [the validation runbook](mac-validation.md).
 
-## Delivered foundation
+## Implemented workflow
 
-- Local Python CLI, strict YAML configuration, SQLite state history, and retryable publication receipts.
-- Safe EPUB container inspection, OPF/spine/navigation checks, text/resource fingerprints, and exact original preservation.
-- EPUBCheck integration with stored machine-readable evidence; optional Ace integration.
-- Human-readable and machine-readable reports, with skipped/unavailable checks shown explicitly.
-- Gated Calibre and optional rclone EPUB publishing.
-- Complete Calibre library snapshots, per-file verification, Google Drive upload, and restoration into a new directory.
+- **Preserve and inspect.** Originals retain their exact bytes and identity hashes.
+  Bounded ZIP/XML/resource inspection records structure, metadata, spine, text and
+  resource fingerprints. EPUBCheck and optional DAISY Ace produce retained quality
+  evidence; required missing, incomplete or failed checks block publication.
+- **Research and choose.** Exact-ISBN and title/author discovery retain edition
+  evidence from Open Library and Google Books. Explicit selection creates scoped
+  proposals. Optional official Meta Model API advice cites recorded evidence and
+  never applies edits or promotes approval. Provider failures remain visible.
+- **Apply scoped edits.** Metadata changes, declared JPEG/PNG cover replacement,
+  missing-cover creation for supported reflowable EPUB 2/3, container packaging
+  repair, case-only TOC path repair, and reviewed numeric typography application
+  have independent preservation checks, validation before activation, retained
+  revisions and rollback. Missing-cover creation explicitly adds a first cover
+  page while preserving old resource bytes and their relative reading order.
+- **Review reading quality.** Offline scrolling and horizontal LTR paginated browser
+  samples, current/trial typography comparisons, font/source/obfuscation inventory,
+  marked-note targets/backlinks and source direction hints are advisory evidence.
+  Book fonts and alignment stay authored; broad CSS or text rewriting is unsupported.
+- **Use one local workspace.** Authenticated loopback-only import/review/actions,
+  saved/stale/incomplete evidence, local library overview, stable-file inbox
+  ingestion, revalidation, and explicit original/approved-revision recovery are
+  available. Interrupted recovery/revalidation leaves approval revoked.
+- **Deliver and restore.** Gated Calibre import, optional rclone EPUB delivery,
+  no-overwrite byte-verified mounted-folder export, full rich Calibre snapshots,
+  cloud upload, integrity verification and restore into a new local directory.
+  Back up the separate Emend workspace independently to retain its originals and
+  evidence. A Calibre backup is the whole Calibre library, not just exported EPUBs.
 
-## Delivered: evidence-backed metadata curation
+## Acceptance still requiring your setup
 
-Exact-ISBN Open Library/Google Books research, cached responses, retained evidence, conservative proposals, explicit title/publisher/date/language edits, independent package/resource preservation checks, validation before activation, revision snapshots, and rollback on failed application. Research candidates retain edition provenance; the new separate cover-review workflow handles comparison and explicit replacement. Open Library edition/author parsing has passed a live exact-ISBN check. Google Books currently returns HTTP 429 in the cloud environment; its successful-response parsing remains fixture-tested.
+Run [automated Mac verification and private real-book review](mac-validation.md).
+Confirm actual Calibre rendering, Google Drive upload/download/restore, retained
+rich library objects, and X4 Pro reading behavior. Broaden the private corpus and
+perform accessibility/screen-reader review. [Executed evidence](validation.md)
+distinguishes actual tools, fixtures, skipped cases and live provider checks.
+[Deferred validation](deferred-validation.md) records the limits.
 
-## Implemented: optional Meta-assisted review
+## Optional extensions after this milestone
 
-`ai-review` uses [Meta Model API](https://dev.meta.ai/products/meta-model-api), with Muse Spark 1.3 Standard mode by default. It reviews only collected metadata evidence, cites existing proposal/record IDs, saves bounded structured advice with request provenance, and never promotes proposals to safe or applies them. Cached reviews avoid repeated calls; explicit refresh and retries remain user-controlled. The documented API contract and failure handling are tested. Authenticated generation passed a synthetic-evidence smoke test on 2026-10-18, including structured citation validation and cache reuse; broader real-edition evaluation remains future work.
-
-## Delivered: edition discovery and cover review
-
-Version 0.3 adds title/author discovery for books without ISBNs, field-by-field edition comparisons, explicit selection into review-only research plans, and match-mode context for Meta advice. Open Library search work records are expanded into edition records before selection.
-
-Cover review downloads bounded recorded candidates or accepts a local image, produces a local side-by-side page with edition provenance and dimension/perceptual-hash hints, and supports explicit replacement of one already-declared JPEG/PNG cover in the same format. Unrelated resources and reading text remain preservation invariants; required validators and rollback remain part of the application path. Automatic artwork certification, format conversion, and layout repair are deferred. Version 0.16 adds explicit missing-cover creation for reflowable EPUB 2/3 without existing declarations or cover-page hints; approved image bytes and a new first cover page are added while existing resources and their relative order remain unchanged.
-
-The complete 157-test suite, including official EPUBCheck integration, passes locally. Live Open Library search and cover download, plus narrow/wide Chromium comparison layouts, were exercised. See [validation evidence](validation.md) and [remaining checks](deferred-validation.md).
-
-## Implemented: offline visual document review
-
-Version 0.4 adds optional Playwright/Chromium sampling of representative spine/navigation documents, compact/wide viewports, bounded vertical screenshots, geometry observations, and self-contained reports tied to an artifact hash. Scripts and network access are disabled, publisher resources remain unchanged, and no approval state is promoted. The default remains scrolling browser documents; version 0.5 adds opt-in page previews below.
-
-## Implemented: local library overview
-
-`library` builds a local HTML/JSON index of recorded book states and the latest review evidence, with bounded pages for larger libraries. It shows stale/incomplete/unavailable records, applied metadata/cover history, pending proposals, and inspection commands. It reads existing evidence without provider calls, browser installation, editing, or publishing.
-
-## Implemented: paginated browser preview
-
-Version 0.5 adds `visual-review --layout paginated` for horizontal LTR reflowable books. Chromium columns provide numbered first/middle/last-page samples with recorded reader margins. Preview-only geometry and break adaptation leave EPUB bytes and publisher text/font styling intact. Unsupported fixed/RTL/vertical layouts are explicit; oversized content, text-edge spillover, and positioned elements produce observations. Existing scrolling reviews remain supported.
-
-## Implemented: explicit container repair
-
-Version 0.9 adds fingerprinted repair proposals with before/after packaging details, a local HTML review, and explicit action approval. Its first action fixes the order/compression of an existing valid `mimetype` ZIP entry and clears that entry's extra fields. All resource payloads, reading content, metadata, and spine order remain unchanged; required validators run before activation. Failed candidates retain the previous book and report, and successful repairs retain revision/history records. Other structural defects and extra-field-only problems remain unsupported.
-
-Version 0.10 adds reviewed case-only table-of-contents path repairs for EPUB 2 NCX and EPUB 3 navigation. It requires a unique existing XHTML spine target and an existing fragment, lists every proposed link change, and independently verifies the changed XML plus unchanged resources/text. Other navigation/body/footnote repairs remain unsupported.
-
-Further work includes a broader structural-repair catalog and explicit typography proposals with visual comparisons. Those changes need their own preservation rules and corpus evidence; the container repair does not establish publication-quality layout.
-
-## Implemented: typography comparisons
-
-Version 0.11 adds explicit line-height/paragraph-spacing trials with current/trial screenshots from one verified EPUB snapshot. Numeric settings, CSS and screenshot evidence are retained; incomplete/stale/tampered results remain distinguishable. Trials preserve book bytes, fonts, alignment, and approval state. Version 0.12 adds explicit application of a complete current trial to sampled documents, or all XHTML spine documents with an additional scope flag. Independent XML/resource/text checks, required validators, revision retention and rollback protect the operation. Version 0.14 adds a loopback-only authenticated review workspace for import, saved/current evidence, explicit metadata/cover/repair/typography actions, revalidation, configured publication and complete-library backups. It reuses core gates and isolates report content. Version 0.15 adds explicit mounted-folder EPUB export with shared publication gates, byte verification, no-overwrite publication, directory identity checks and retry reconciliation. It is available in the CLI and as a startup-configured workspace destination. Device/firmware compatibility still needs the actual hardware. Version 0.17 adds explicit recovery to the original or a previously approved retained revision, including interrupted initial imports. Approval is revoked before replacement; prior current bytes move to quarantine and current quality gates run again. Interrupted recovery remains blocked and retryable. Release verification follows.
-
-## Implemented: offline reading evidence
-
-Version 0.13 records manifest font/source/obfuscation evidence, marked note targets and reciprocal backlinks, document language and source direction hints. It is bounded, hash-registered and advisory; missing evidence remains visible without changing approval. Synthetic cases include embedded fonts, declared obfuscation, semantic/missing/unmarked notes, nested CSS, RTL/vertical declarations, and real EPUBCheck acceptance. Actual font/glyph coverage, assistive reading, popup/back navigation and device fidelity remain real-reader checks.
-
-## Next: reader calibration and accessibility depth
-
-Version 0.6 adds structured Ace rule findings to quality reports, raw-evidence fingerprints, conservative handling of incomplete/malformed results, and optional-audit warnings in the library overview. Hosted integration tests exercise DAISY Ace 1.4.6 on original EPUB 2/3 fixtures. Automated audits remain separate from manual conformance review.
-
-Version 0.7 adds `revalidate` to refresh quality evidence for the current EPUB while preserving curated metadata, cover bytes, and history. Approval is revoked before checks start; failed or interrupted attempts retain the current bytes for review and retry, with publication blocked. An unchanged successful revalidation keeps the same revision identity and publication receipts.
-
-Calibrate browser pagination against real reader screenshots, extend supported writing/layout modes, and verify footnote behavior. Broaden accessibility testing to a real-book corpus and screen readers, extend font/footnote/layout coverage, and add optional multimodal advice. Actual Apple Books and XTEINK checks remain necessary before making device claims.
-
-## Later: device delivery and automation
-
-Version 0.8 adds safe inbox ingestion: one-shot batches or foreground polling, stable-file observation and bounded snapshots, and atomic recognition of known originals and retained curated revisions. It preserves source files, retries busy operations, and keeps research/editing/publication explicit. It does not install a background service.
-
-Verify the X4 Pro's installed firmware and supported transfer protocol before implementing CrossPoint delivery. Stage caches, scheduling, per-device profiles, and a focused review UI remain later work after the inspection/repair corpus is established.
-
-Only the optional AI review command requires an AI credential. Firmware installation, background services, rendering, and typography transformation are not required for the current workflow. Advanced checks are not represented as passing placeholders.
+A broader structural/footnote/layout repair catalog, SVG/ambiguous cover repair,
+format conversion, font/glyph validation, fixed/RTL/vertical pagination, calibrated
+device profiles, multimodal advice, and scheduling/background services need their
+own requirements and corpus evidence. CrossPoint/network delivery depends on the
+actual installed firmware and a verified protocol. These extensions are outside
+the completed release scope; no passing placeholders or device certification are
+substituted for them.

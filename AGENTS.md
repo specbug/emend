@@ -105,7 +105,9 @@ Report skipped integrations separately from passing checks.
 | EPUBCheck | Java 21 and `bash scripts/setup-cloud.sh`; set `EMEND_TEST_EPUBCHECK_JAR` to the installed JAR. The script verifies the official distribution checksum. |
 | Browser review | `uv run --extra visual playwright install chromium`; set `EMEND_TEST_PLAYWRIGHT=1`, or use `EMEND_TEST_CHROMIUM` with an existing Chromium executable. |
 | DAISY Ace | Node.js 22+ and `bash scripts/setup-ace.sh`; set `EMEND_TEST_ACE` to the installed `node_modules/.bin/ace-cli`. Its Puppeteer browser is separate from Playwright. |
-| Calibre | On Linux x86_64, `bash scripts/setup-calibre.sh` installs a checksum-verified official build. Set `EMEND_TEST_CALIBRE_BIN` to the directory containing `calibredb`, `ebook-meta`, `ebook-convert`, and `calibre-debug`. Other platforms can use an existing installation. Tests use disposable libraries. |
+| Calibre | On Linux x86_64 and macOS (Apple silicon/Intel), `bash scripts/setup-calibre.sh` installs a checksum-verified official build in an isolated tools directory. Set `EMEND_TEST_CALIBRE_BIN` to the directory containing `calibredb`, `ebook-meta`, `ebook-convert`, and `calibre-debug`. Mac tools are inside `calibre.app/Contents/MacOS`; other platforms can use an existing installation. Tests use disposable libraries. |
+
+[Mac verification](docs/mac-validation.md) documents the repeatable disposable-library command and later personal/device acceptance.
 
 [CI](.github/workflows/tests.yml) is the reference for the combined macOS/Linux
 integration setup. Never weaken assertions or substitute a mocked success for a

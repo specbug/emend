@@ -371,3 +371,78 @@ def test_applied_repair_retry_does_not_claim_failed_revalidation_passed(tmp_path
     assert revalidate(before.book_id, config).state == "REVIEW_REQUIRED"
     with pytest.raises(ValueError, match="already applied"):
         apply(plan, config)
+
+
+@pytest.mark.parametrize("defect", ["extra", "local-only", "prefix"])
+@pytest.mark.parametrize("version", ["2.0", "3.0"])
+def test_mimetype_header_only_defects_have_explicit_preserving_repair(
+    tmp_path, config, defect, version
+):
+    import struct
+
+    from tests.epub_factory import write_epub
+
+    if jar := os.environ.get("EMEND_TEST_EPUBCHECK_JAR"):
+        config.tools.epubcheck = None
+        config.tools.epubcheck_jar = Path(jar)
+    source = write_epub(tmp_path / "header.epub", version=version)
+    if defect == "prefix":
+        source.write_bytes(b"publisher preamble" + source.read_bytes())
+    else:
+        with zipfile.ZipFile(source) as archive:
+            entries = [(copy.copy(i), archive.read(i)) for i in archive.infolist()]
+        with zipfile.ZipFile(source, "w") as archive:
+            for info, data in entries:
+                if info.filename == "mimetype":
+                    info.extra = b"\xfe\xca\x00\x00"
+                archive.writestr(info, data)
+        if defect == "local-only":
+            data = bytearray(source.read_bytes())
+            central = data.index(b"PK\x01\x02")
+            # Central header: filename length at 28, extra length at 30, fixed size 46.
+            length = struct.unpack_from("<H", data, central + 28)[0]
+            assert data[central + 46 : central + 46 + length] == b"mimetype"
+            struct.pack_into("<H", data, central + 30, 0)
+            del data[central + 46 + length : central + 46 + length + 4]
+            end = data.rindex(b"PK\x05\x06")
+            size = struct.unpack_from("<I", data, end + 12)[0]
+            struct.pack_into("<I", data, end + 12, size - 4)
+            source.write_bytes(data)
+    before = ingest(source, config)
+    assert {f.code for f in before.inspection.findings if f.severity == "error"} == {
+        "zip.mimetype_header"
+    }
+    plan, _ = prepare_repairs(before.book_id, config)
+    assert plan.actions == [ACTION]
+    if defect == "local-only":
+        assert plan.before.extra_bytes == 0 and plan.before.local_extra_bytes == 4
+    after = apply(plan, config)
+    assert after.state == "VALIDATED"
+    assert after.inspection.resource_hashes == before.inspection.resource_hashes
+    assert sha256_file(config.root / "originals" / f"{before.book_id}.epub") == before.book_id
+
+
+def test_central_only_mimetype_extra_is_not_a_local_header_defect(tmp_path, config):
+    import struct
+
+    from emend.validation import validate_epubcheck
+    from tests.epub_factory import write_epub
+
+    source = write_epub(tmp_path / "central-only.epub")
+    data = bytearray(source.read_bytes())
+    central = data.index(b"PK\x01\x02")
+    length = struct.unpack_from("<H", data, central + 28)[0]
+    assert data[central + 46 : central + 46 + length] == b"mimetype"
+    struct.pack_into("<H", data, central + 30, 4)
+    data[central + 46 + length : central + 46 + length] = b"\xfe\xca\x00\x00"
+    end = data.rindex(b"PK\x05\x06")
+    size = struct.unpack_from("<I", data, end + 12)[0]
+    struct.pack_into("<I", data, end + 12, size + 4)
+    source.write_bytes(data)
+    if jar := os.environ.get("EMEND_TEST_EPUBCHECK_JAR"):
+        config.tools.epubcheck = None
+        config.tools.epubcheck_jar = Path(jar)
+        evidence = tmp_path / "checker"
+        evidence.mkdir()
+        assert validate_epubcheck(source, evidence, config).status == "passed"
+    assert not inspect_epub(source, config.limits).blocking

@@ -34,6 +34,15 @@ def sha256_file(path: Path) -> str:
         return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
+def local_extra_bytes(path: Path, info: zipfile.ZipInfo) -> int:
+    with path.open("rb") as stream:
+        stream.seek(info.header_offset)
+        header = stream.read(30)
+    if len(header) != 30 or header[:4] != b"PK\x03\x04":
+        return -1
+    return int.from_bytes(header[28:30], "little")
+
+
 def local_target(source: str, href: str) -> tuple[str, str] | None:
     """Resolve one URL exactly once; reject filesystem escape and active schemes."""
     url = urlsplit(href)
@@ -170,6 +179,14 @@ class Inspector:
                         "error",
                         "mimetype must be the first, uncompressed ZIP entry.",
                     )
+                if "mimetype" in names:
+                    mime = archive.getinfo("mimetype")
+                    if mime.header_offset != 0 or local_extra_bytes(self.path, mime) != 0:
+                        self.add(
+                            "zip.mimetype_header",
+                            "error",
+                            "mimetype must start at byte zero and have no local ZIP extra fields.",
+                        )
                 for item in members:
                     if not item.is_dir():
                         self.files[item.filename] = archive.read(item)  # verifies CRC

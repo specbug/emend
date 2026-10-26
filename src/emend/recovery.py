@@ -138,7 +138,7 @@ def recover(
         regular(original, limit)
         if sha256_file(original) != book:
             raise ValueError(
-                "Stored original hash mismatch; restore a verified library backup first."
+                "Stored original hash mismatch; restore the byte-identical original from your source backup first."
             )
         source = original if digest == book else store.root / "versions" / book / f"{digest}.epub"
         regular(source, limit)

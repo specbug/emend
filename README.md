@@ -195,7 +195,7 @@ The plan records the current EPUB/report hashes, quality policy, and inspection 
 
 The `container.mimetype` action moves the existing `mimetype` entry first, stores it uncompressed, and removes its ZIP extra fields. **Every resource payload stays byte-identical**, including OPF metadata, XHTML, CSS, images, fonts, unmanifested files, and directory records. Other entries retain their relative order, compression, timestamps, extra fields, and comments; the archive comment is retained. ZIP compression/header bytes may differ, so the repaired EPUB has a new hash. Original bytes and pre/post repair revisions are retained.
 
-The container action supports only the built-in `zip.mimetype_order` error, with no other structural errors. Missing/incorrect mimetype content, unsafe/duplicate entries, encryption problems, malformed XML, and other defects require manual review and receive no supported action. An extra-field-only defect is not yet detected/proposed by this workflow. It does not repair typography, text, navigation, or missing resources; the separate navigation action below handles one specific link defect.
+The container action supports the built-in `zip.mimetype_order` and `zip.mimetype_header` errors, with no other structural errors. Missing/incorrect mimetype content, unsafe/duplicate entries, encryption problems, malformed XML, and other defects require manual review and receive no supported action. Local extra-field-only defects and prepended container bytes are detected and proposed explicitly. It does not repair typography, text, navigation, or missing resources; the separate navigation action below handles one specific link defect.
 
 Applying checks preservation independently and runs the configured validators before activating the candidate. Failure keeps the previous book, report, and approval state, while saving rejection evidence. Repair history survives subsequent metadata/cover edits and revalidation. Repeating a successful application is idempotent; it cannot clear later failed/pending gates—use `revalidate` for those. Publishing the repaired revision remains explicit. The apply command exits `1` for rejected quality gates and `2` for invalid requests or operational errors.
 
@@ -522,6 +522,21 @@ recovery, or use `revalidate` if the selected copy is already intact. The worksp
 shows recovery controls for unavailable books and provides a recovery link for
 intact ones. Restoring an earlier revision restores its edit history; newer edits
 remain in retained reports/revisions. Quarantine files are evidence, never approved
-recovery sources. Missing or damaged originals require a verified Emend backup.
+recovery sources. Missing or damaged originals require the byte-identical source from your own backup.
+Keep the Emend data directory backed up separately; Calibre-library backups do not
+include Emend originals or review history.
 Recovery does not restore the Calibre library: use the separate rich-library
 backup/restore workflow for that.
+
+### Release verification
+
+[Mac validation and first real library/device review](docs/mac-validation.md)
+provides the repeatable `scripts/verify-local.sh` command, optional isolated official
+Calibre installation on Apple silicon/Intel, and the later private Calibre/Drive/
+X4 Pro acceptance steps. CI runs actual Calibre on Linux and macOS. The complete
+workflow tests use disposable libraries and synthetic EPUB 2/3 books.
+
+Version 0.18 uses engine 3 to detect mimetype local extra fields and
+prepended container bytes, and proposes their explicit packaging repair. Existing
+approved books need `revalidate` before publishing with this engine; prepare new
+reviews/trials before applying changes. Other structural defects remain manual.

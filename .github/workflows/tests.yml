@@ -1,8 +1,12 @@
 name: Tests
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 jobs:
   tests:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       matrix:
         os: [ubuntu-24.04, macos-latest]
@@ -55,6 +59,29 @@ jobs:
           PYDIAG
             exit "$emend_setup_status"
           fi
+      - name: Install official Calibre CLI and rclone (macOS)
+        if: runner.os == 'macOS'
+        env:
+          EMEND_CALIBRE_DIR: ${{ runner.temp }}/emend-calibre
+        run: |
+          set +e
+          (
+            brew install rclone &&
+            bash scripts/setup-calibre.sh
+          ) > "$RUNNER_TEMP/emend-calibre-setup.log" 2>&1
+          emend_setup_status=$?
+          set -e
+          cat "$RUNNER_TEMP/emend-calibre-setup.log"
+          if [ "$emend_setup_status" -ne 0 ]; then
+            python3 - <<'PYDIAG'
+          import os
+          from pathlib import Path
+          message = (Path(os.environ["RUNNER_TEMP"]) / "emend-calibre-setup.log").read_text(errors="replace")[-3000:]
+          message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          print(f"::error::Calibre setup failed: {message}")
+          PYDIAG
+            exit "$emend_setup_status"
+          fi
       - run: uv run --extra visual ruff check . && uv run --extra visual ruff format --check .
       - name: Run regression tests with external integrations
         env:
@@ -62,8 +89,10 @@ jobs:
           EMEND_TEST_PLAYWRIGHT: "1"
           EMEND_TEST_ACE: ${{ runner.temp }}/emend-ace/node_modules/.bin/ace-cli
           PUPPETEER_CACHE_DIR: ${{ runner.temp }}/puppeteer
-          EMEND_TEST_CALIBRE_BIN: ${{ runner.os == 'Linux' && format('{0}/emend-calibre', runner.temp) || '' }}
+          EMEND_TEST_CALIBRE_BIN: ${{ runner.os == 'Linux' && format('{0}/emend-calibre', runner.temp) || format('{0}/emend-calibre/calibre.app/Contents/MacOS', runner.temp) }}
         run: uv run --extra visual pytest -q --junitxml="${{ runner.temp }}/emend-tests.xml"
+      - name: Build distributions
+        run: uv build
       - name: Annotate test failures
         if: failure()
         run: |
