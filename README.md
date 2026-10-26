@@ -505,3 +505,23 @@ previous artifact. Sources below 600 pixels on their short edge require the
 recorded `--allow-small` exception after checking readability. No artwork is
 invented or matched automatically. Existing declared covers use `apply-cover`.
 Both operations are available in the local review workspace.
+
+### Recovering an interrupted or damaged current artifact
+
+```sh
+emend recovery-options BOOK --config emend.yaml
+emend recover BOOK --revision original --approve --config emend.yaml
+# Or choose a full retained SHA-256 from recovery-options instead of original.
+```
+
+Recovery accepts the preserved original or a retained revision backed by a saved
+successful quality report. It verifies the selected bytes, revokes approval before
+replacement, moves the previous current artifact into `quarantine/`, and reruns
+current required validators. An interruption leaves publication blocked; retry
+recovery, or use `revalidate` if the selected copy is already intact. The workspace
+shows recovery controls for unavailable books and provides a recovery link for
+intact ones. Restoring an earlier revision restores its edit history; newer edits
+remain in retained reports/revisions. Quarantine files are evidence, never approved
+recovery sources. Missing or damaged originals require a verified Emend backup.
+Recovery does not restore the Calibre library: use the separate rich-library
+backup/restore workflow for that.

@@ -132,13 +132,40 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             f'<header><div class="brand">EMEND / REVIEW</div><h1>Your library</h1><p>Inspect evidence, review proposed changes, and publish when the required checks pass.</p></header><section><h2>Import a book</h2>{upload}</section><section><h2>Books</h2><p class="quiet">Recorded states are a snapshot. Opening a book checks its current identity.</p><table><thead><tr><th>Book</th><th>Recorded state</th><th>Identity</th></tr></thead><tbody>{"".join(items)}</tbody></table>{paging if items else "<p>No books yet. Import an EPUB above.</p>"}</section>{backup}',
         )
 
-    def book(self, book):
-        saved = self.store.resolve(book)
-        if not saved["report_path"] or Path(saved["report_path"]).stat().st_size > 8 * 1024**2:
-            raise ValueError(
-                "No bounded completed report is available; inspect/recover this book using the CLI."
+    def recovery(self, book, reason=""):
+        from emend.recovery import recovery_options
+
+        row = self.store.resolve(book)
+        options = recovery_options(row["id"], self.config)
+        choices = "".join(
+            f'<label><input type="radio" name="revision" value="{esc(c["sha256"])}" required>{"Preserved original" if c["original"] else "Previously approved revision"} · <code>{esc(c["sha256"])}</code></label>'
+            for c in options
+        )
+        body = f'<header><div class="brand">EMEND / RECOVERY</div><h1>Recover a book</h1><p>{esc(row["source_name"])}</p></header>'
+        if reason:
+            body += f'<p class="error">{esc(reason)}</p>'
+        body += "<p>Choose a revision to restore. Current artifact bytes, if present, move to quarantine. Original bytes stay preserved. Approval is revoked before replacement and all required checks run again. Listed files are verified when recovery runs.</p>"
+        if choices:
+            choices += '<label><input type="checkbox" name="approve" value="yes" required>I approve replacing the current artifact with this revision.</label>'
+            body += self.form(
+                "recover",
+                "Restore selected revision and revalidate",
+                choices,
+                book=row["id"],
+                hidden={"expected_report": row["report_path"] or ""},
             )
-        row, _, digest = current_source(self.store, book, self.config)
+        else:
+            body += "<p>No retained source is available. Restore a verified Emend backup first.</p>"
+        return self.page("Recovery", body)
+
+    def book(self, book):
+        try:
+            saved = self.store.resolve(book)
+            if not saved["report_path"] or Path(saved["report_path"]).stat().st_size > 8 * 1024**2:
+                raise ValueError("No bounded completed report is available.")
+            row, _, digest = current_source(self.store, book, self.config)
+        except (ValueError, OSError) as exc:
+            return self.recovery(book, str(exc))
         book = row["id"]
         report = get_report(self.store, book)
         title = "; ".join(report.inspection.metadata.get("title", [])) or row["source_name"]
@@ -156,6 +183,7 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             + form("revalidate", "Revalidate current EPUB")
             + "</section>"
         )
+        body += f'<p><a href="/recovery/{book}">Recover original or retained revision</a></p>'
         inspection_section = (
             '<section><h2>Inspect layout and reading details</h2><p>These reviews are advisory. They do not change the EPUB or approve it for a device.</p><div class="controls">'
             + form("visual", "Capture visual review")
@@ -360,6 +388,19 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             result = backup_library(self.config, True, upload=value(form, "upload") == "yes")
             self.notice = f"Verified backup saved: {result['archive']}. Cloud status: {result.get('cloud_status', 'local only')}."
             return "/"
+        if action == "recover":
+            from emend.recovery import recover
+
+            if value(form, "approve") != "yes":
+                raise ValueError("Explicitly approve replacing the current artifact.")
+            recover(
+                book,
+                self.config,
+                revision=value(form, "revision"),
+                approve=True,
+                expected_report_path=value(form, "expected_report"),
+            )
+            return "/books/" + self.store.resolve(book)["id"]
         row, _, digest = current_source(self.store, book, self.config)
         book = row["id"]
         if value(form, "artifact") != digest:
@@ -606,6 +647,9 @@ class ReviewHandler(BaseHTTPRequestHandler):
             parts = url.path.strip("/").split("/")
             if len(parts) == 2 and parts[0] == "books":
                 self.send(200, self.server.app.book(parts[1]))
+                return
+            elif len(parts) == 2 and parts[0] == "recovery":
+                self.send(200, self.server.app.recovery(parts[1]))
                 return
             if len(parts) == 4 and parts[0] == "evidence" and parts[2] in EVIDENCE:
                 _, book, kind, identifier = parts

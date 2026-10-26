@@ -109,6 +109,14 @@ class CoverAddition(BaseModel):
     after_sha256: str
 
 
+class RecoveryChange(BaseModel):
+    revision_sha256: str
+    original: bool
+    previous_report_path: str | None = None
+    quarantine_path: str
+    created_at: str
+
+
 class Report(BaseModel):
     book_id: str
     source_name: str
@@ -125,6 +133,7 @@ class Report(BaseModel):
     repair_changes: list[RepairChange] = Field(default_factory=list)
     typography_changes: list[TypographyChange] = Field(default_factory=list)
     cover_additions: list[CoverAddition] = Field(default_factory=list)
+    recovery_changes: list[RecoveryChange] = Field(default_factory=list)
     changes: list[str] = Field(default_factory=list)
     metadata_changes: list[MetadataChange] = Field(default_factory=list)
     research_plan_id: str | None = None

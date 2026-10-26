@@ -191,3 +191,18 @@ official EPUBCheck 5.3.0 after creation. The final manifest-driven cover-hint sc
 also passes the focused creation suite. Real Calibre, EPUBCheck and Chromium
 integrations were enabled for the full run. Artwork/edition approval and actual
 reader cover-page rendering remain human checks.
+
+## Explicit revision recovery (0.17)
+
+The combined full suite passes **496 tests**, with five local Ace skips and real
+EPUBCheck, Chromium and Calibre enabled. Recovery initially added 18 cases,
+including real process-kill recovery, current-byte quarantine, original/approved
+revision selection, selected edit-history restoration, interrupted initial import,
+stale UI refusal, tampered originals/revisions, required-validator failure, and
+interruptions before/during/after replacement. Five additional focused cases
+cover CLI failure exit status, symlink-original refusal, and database failures at
+all three transitions. The final focused recovery/pipeline run passes 41 cases
+with only its official-checker case skipped when that opt-in is absent. The
+separate checker-enabled recovery run passed. Reports also expose recovery history.
+Filesystem exhaustion, sudden power loss, and the target Mac remain external
+validation; injected faults and process termination do not certify those cases.
