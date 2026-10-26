@@ -49,6 +49,7 @@ class Sample(BaseModel):
     document_height: int = 0
     page_count: int | None = None
     observations: list[str] = Field(default_factory=list)
+    typography: list[dict[str, str]] = Field(default_factory=list)
     screenshots: list[Shot] = Field(default_factory=list)
     error: str | None = None
 
@@ -124,6 +125,13 @@ MEASURE = """() => {
         broken:images.filter(i=>!i.complete || !i.naturalWidth).length,
         images:images.length, text:(document.body?.innerText || '').trim().length,
         tiny, fonts:[...document.fonts].filter(f=>f.status==='error').length,
+        typography:[['body',document.body], ...[...document.querySelectorAll('p')].slice(0,3).map((p,i)=>['p'+(i+1),p])]
+            .filter(([label,node])=>node && visible(node)).map(([element,node])=>{
+                const c=getComputedStyle(node);
+                return {element,font_family:c.fontFamily,font_size:c.fontSize,line_height:c.lineHeight,
+                    margin_before:c.marginBlockStart,margin_after:c.marginBlockEnd,
+                    text_align:c.textAlign,text_indent:c.textIndent,font_weight:c.fontWeight,font_style:c.fontStyle};
+            }),
         truncated:document.querySelectorAll('body *').length>20000};
 }"""
 
@@ -253,6 +261,7 @@ def render(
                                 sample.observations.extend(pagination["observations"])
                             metrics = page.evaluate(MEASURE)
                             sample.document_height = metrics["height"]
+                            sample.typography = metrics["typography"]
                             if layout == "scroll" and metrics["width"] > width + 2:
                                 sample.observations.append(
                                     f"Horizontal overflow: {metrics['width']} CSS px in a {width} px viewport."

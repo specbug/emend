@@ -212,6 +212,12 @@ def test_real_browser_trial_changes_spacing_without_editing_epub(
     assert trial.status == "complete", trial.model_dump()
     original, adjusted = trial.before[0], trial.after[0]
     assert original.screenshots[0].sha256 != adjusted.screenshots[0].sha256
+    assert adjusted.typography and original.typography
+    body = adjusted.typography[0]
+    assert float(body["line_height"].removesuffix("px")) == pytest.approx(
+        2.2 * float(body["font_size"].removesuffix("px"))
+    )
+    assert original.typography[0]["font_family"] == body["font_family"]
     if layout == "scroll":
         assert adjusted.document_height > original.document_height
     else:
