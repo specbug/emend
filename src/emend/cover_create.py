@@ -18,6 +18,7 @@ from emend.covers import declared_cover, image_details, load_cover_review, read_
 from emend.inspect import NS, inspect_epub, local_target, parse_xml, sha256_file
 from emend.models import CoverAddition, Gate
 from emend.navigation_repair import same_xml, serialize
+from emend.pagination import fixed_layout
 from emend.pipeline import atomic_copy
 from emend.publish import approved_artifact
 from emend.reports import write_reports
@@ -290,10 +291,7 @@ def create_cover(book_id, config: Config, *, review_id, approve, allow_small=Fal
                 package = parse_xml(archive.read(baseline.package_path))
                 if declared_cover(source, baseline.package_path):
                     raise ValueError("A cover declaration already exists.")
-                if package.xpath(
-                    "opf:metadata/opf:meta[@property='rendition:layout' and normalize-space(.)='pre-paginated']",
-                    namespaces=NS,
-                ):
+                if fixed_layout(package):
                     raise ValueError(
                         "Missing-cover creation currently supports reflowable EPUBs only."
                     )

@@ -238,3 +238,8 @@ platform result; the final PR remains draft until those checks finish. The Mac
 installer uses the official checksum/size-verified universal DMG in an isolated
 tools directory. Personal Mac/Drive/X4 Pro and publication-quality acceptance
 remain the checks in [the runbook](mac-validation.md).
+
+Final review extended missing-cover refusal to legacy fixed-layout metadata and
+per-spine fixed-layout declarations, sharing the existing pagination classifier.
+The focused checker/browser-enabled cover and pagination suites pass **40 tests**,
+including the three additional refusal cases and legacy EPUB 2 coverage.

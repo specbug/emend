@@ -15,7 +15,7 @@ def validate_layout(layout: str, page_margin: int):
         raise ValueError("Page margin must be between 16 and 120 CSS pixels.")
 
 
-def check_package(package):
+def fixed_layout(package):
     fixed = package.xpath(
         "opf:metadata/opf:meta[@property='rendition:layout' and normalize-space(.)='pre-paginated']"
         " | opf:metadata/opf:meta[@name='fixed-layout' and @content='true']",
@@ -25,7 +25,11 @@ def check_package(package):
         "rendition:layout-pre-paginated" in item.get("properties", "").split()
         for item in package.xpath("opf:spine/opf:itemref", namespaces=NS)
     )
-    if fixed or fixed_spine:
+    return bool(fixed or fixed_spine)
+
+
+def check_package(package):
+    if fixed_layout(package):
         raise ValueError(
             "Paginated preview supports reflowable EPUBs only; use --layout scroll for fixed-layout books."
         )
