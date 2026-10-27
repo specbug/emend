@@ -178,3 +178,16 @@ Typography application checks compare computed body/paragraph styles and documen
 The local full suite passes **463 tests**, with five local Ace CLI skips. The 22 new cases exercise native atomic no-overwrite delivery and idempotency, existing different files/symlinks, unsafe filenames, managed/library/missing destinations, competing writers, changed directories, unavailable rename/fsync, receipt failure/retry reconciliation, policy/revision guards, Unicode filenames, directory-sync limitations, and CLI/workspace use of an explicit destination. Actual exported bytes match the approved EPUB; no source or unrelated destination data is altered.
 
 Linux uses `renameat2(RENAME_NOREPLACE)` and macOS uses `renameatx_np(RENAME_EXCL)`; Darwin's flag/signature were checked against Apple's published XNU header. Hosted macOS/Linux tests exercise their native implementation. A real reader filesystem, mount/unplug behavior, safe eject, filename support, and firmware rendering remain hardware validation, not inferred from a temporary-folder test.
+
+## Missing-cover creation (0.16)
+
+The combined local suite passes **478 tests**, with five full Ace cases explicitly
+skipped because of the managed browser restriction. Fifteen creation cases cover
+EPUB 2/3, exact original resource bytes and relative spine order, registered
+candidate identity/provenance, small-source exceptions, existing declarations and
+cover hints, fixed-layout refusal, injected resource changes, validator/database/
+activation failures, rollback, and the workspace action. Both EPUB versions pass
+official EPUBCheck 5.3.0 after creation. The final manifest-driven cover-hint scan
+also passes the focused creation suite. Real Calibre, EPUBCheck and Chromium
+integrations were enabled for the full run. Artwork/edition approval and actual
+reader cover-page rendering remain human checks.

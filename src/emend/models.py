@@ -96,6 +96,19 @@ class TypographyChange(BaseModel):
     after_sha256: str
 
 
+class CoverAddition(BaseModel):
+    review_id: str
+    candidate_id: str
+    image_path: str
+    page_path: str
+    image_sha256: str
+    source: str
+    source_url: str | None = None
+    allowed_small: bool = False
+    before_sha256: str
+    after_sha256: str
+
+
 class Report(BaseModel):
     book_id: str
     source_name: str
@@ -111,6 +124,7 @@ class Report(BaseModel):
     revalidation: bool = False
     repair_changes: list[RepairChange] = Field(default_factory=list)
     typography_changes: list[TypographyChange] = Field(default_factory=list)
+    cover_additions: list[CoverAddition] = Field(default_factory=list)
     changes: list[str] = Field(default_factory=list)
     metadata_changes: list[MetadataChange] = Field(default_factory=list)
     research_plan_id: str | None = None
