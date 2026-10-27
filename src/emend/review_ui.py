@@ -19,6 +19,8 @@ from emend.reports import report_styles
 from emend.research.discovery import current_source
 from emend.storage import OperationBusyError, Store
 
+EPUB_UPLOAD_MAX_MIB = 128
+
 EVIDENCE = {"cover-review", "repairs", "visual-review", "typography-trial", "reading-review"}
 
 
@@ -113,7 +115,7 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             items.append(
                 f'<tr><th><a href="/books/{row["id"]}">{esc(title[:2000])}</a></th><td>{esc(row["state"])}</td><td><code>{row["id"][:12]}</code></td></tr>'
             )
-        upload = f'''<form method="post" action="/action" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{self.csrf}"><input type="hidden" name="action" value="import"><label>Choose an EPUB <input type="file" name="epub" accept=".epub,application/epub+zip" required></label><p class="quiet">Up to 64 MiB here. Use the inbox/CLI for larger files. Known books are left unchanged.</p><button>Import EPUB</button></form>'''
+        upload = f'''<form method="post" action="/action" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{self.csrf}"><input type="hidden" name="action" value="import"><label>Choose an EPUB <input type="file" name="epub" accept=".epub,application/epub+zip" required></label><p class="quiet">Up to {min(self.config.limits.max_archive_mb, EPUB_UPLOAD_MAX_MIB)} MiB here. Use the inbox/CLI for larger files. Known books are left unchanged.</p><button>Import EPUB</button></form>'''
         paging = (
             f'<a href="/?offset={max(0, offset - 100)}">Previous books</a> ' if offset else ""
         ) + (f'<a href="/?offset={offset + 100}">Next books</a>' if len(rows) > 100 else "")
@@ -684,7 +686,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         content_type = self.headers.get("Content-Type", "")
         multipart = content_type.lower().startswith("multipart/form-data;")
         limit = (
-            min(self.server.app.config.limits.max_archive_mb, 64) * 1024**2 + 65536
+            min(self.server.app.config.limits.max_archive_mb, EPUB_UPLOAD_MAX_MIB) * 1024**2 + 65536
             if multipart
             else 65536
         )
@@ -731,7 +733,10 @@ class ReviewHandler(BaseHTTPRequestHandler):
                         if (
                             len(data)
                             > (
-                                min(self.server.app.config.limits.max_archive_mb, 64)
+                                min(
+                                    self.server.app.config.limits.max_archive_mb,
+                                    EPUB_UPLOAD_MAX_MIB,
+                                )
                                 if name == "epub"
                                 else 20
                             )
