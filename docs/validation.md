@@ -158,3 +158,9 @@ A standalone fixture passed official EPUBCheck and produced a complete trial. Th
 The full local suite passes **410 tests**, with five full Ace CLI checks skipped locally. The 20 new cases exercise explicit approval and document/all-spine scope, EPUB 2/3 resource/XML/text preservation, unchanged font/image/existing CSS bytes, idempotency, history through metadata edits/revalidation, validator failure, stale/incomplete evidence, and rollback after database/copy failure. Independent checks reject unapproved text, CSS, links, manifest metadata, archive entries, and stylesheet changes. Official EPUBCheck accepts applied EPUB 2 and EPUB 3 styles.
 
 A real Chromium check applies the reviewed CSS to the EPUB and captures it through the normal renderer. Its document height and first screenshot hash exactly match the trial's adjusted view. This establishes the controlled fixture's cascade/geometry; it does not certify every publisher layout, unsampled content, device rendering, or interruption durability during activation.
+
+## Offline reading evidence (0.13)
+
+The full local suite passes **424 tests**, with five local Ace CLI skips. The 14 new cases cover font hashes/source declarations, nested and inline CSS, local/declared-obfuscated fonts, marked versus unmarked notes, missing semantics/backlinks/reference IDs, bounded incomplete evidence, language/direction hints, escaped markup, tampered records, and CLI saved/incomplete behavior. CSS comments are not treated as declarations. No book/report/state mutation occurs.
+
+A synthetic corpus with an embedded licensed font and reciprocal semantic note passed official EPUBCheck and produced complete reading evidence. Its HTML was rendered at desktop/phone widths without overflow and inspected at the narrow width. This is a source inventory and relationship audit, not glyph coverage, a resolved style cascade, screen-reader evaluation, or device conformance.

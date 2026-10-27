@@ -67,6 +67,9 @@ Keep reader compatibility claims tied to actual device evidence.
   CSS application. Keep `typography_changes` through later edits; verify stylesheet
   declarations independently and preserve all text/unrelated resources. The current/trial
   captures must share one verified snapshot and evidence must remain hash-checked.
+- `reading_review.py`: bounded offline font/marked-note/direction evidence.
+  Keep source observations distinct from glyph coverage, reader behavior and
+  accessibility conformance; limits must produce incomplete evidence.
 - `reports.py`, `library.py`, `assets/`, `cli.py`: local reports, overview, and CLI.
 - `publish.py`, `backup.py`: delivery and full-library backup/restore.
 - Paths above are relative to `src/emend/`. `tests/epub_factory.py` supplies small

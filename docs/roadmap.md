@@ -51,6 +51,10 @@ Further work includes a broader structural-repair catalog and explicit typograph
 
 Version 0.11 adds explicit line-height/paragraph-spacing trials with current/trial screenshots from one verified EPUB snapshot. Numeric settings, CSS and screenshot evidence are retained; incomplete/stale/tampered results remain distinguishable. Trials preserve book bytes, fonts, alignment, and approval state. Version 0.12 adds explicit application of a complete current trial to sampled documents, or all XHTML spine documents with an additional scope flag. Independent XML/resource/text checks, required validators, revision retention and rollback protect the operation. A consolidated review interface is the next implementation step.
 
+## Implemented: offline reading evidence
+
+Version 0.13 records manifest font/source/obfuscation evidence, marked note targets and reciprocal backlinks, document language and source direction hints. It is bounded, hash-registered and advisory; missing evidence remains visible without changing approval. Synthetic cases include embedded fonts, declared obfuscation, semantic/missing/unmarked notes, nested CSS, RTL/vertical declarations, and real EPUBCheck acceptance. Actual font/glyph coverage, assistive reading, popup/back navigation and device fidelity remain real-reader checks.
+
 ## Next: reader calibration and accessibility depth
 
 Version 0.6 adds structured Ace rule findings to quality reports, raw-evidence fingerprints, conservative handling of incomplete/malformed results, and optional-audit warnings in the library overview. Hosted integration tests exercise DAISY Ace 1.4.6 on original EPUB 2/3 fixtures. Automated audits remain separate from manual conformance review.
