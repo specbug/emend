@@ -581,6 +581,36 @@ def apply_cover_command(
         fail(exc)
 
 
+@app.command("recovery-options")
+def recovery_options_command(book_id: str, config: ConfigOption = None):
+    """List the original and retained previously approved revision identities."""
+    from emend.recovery import recovery_options
+
+    try:
+        typer.echo(json.dumps(recovery_options(book_id, load_config(config)), indent=2))
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("recover")
+def recover_command(
+    book_id: str,
+    revision: Annotated[str, typer.Option(help="original or full retained SHA-256")],
+    approve: bool = False,
+    config: ConfigOption = None,
+):
+    """Quarantine the current artifact, restore a selected revision and revalidate."""
+    from emend.recovery import recover
+
+    try:
+        result = recover(book_id, load_config(config), revision=revision, approve=approve)
+        typer.echo(report_text(result))
+        if result.state != "VALIDATED":
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 @app.command("create-cover")
 def create_cover_command(
     book_id: str,

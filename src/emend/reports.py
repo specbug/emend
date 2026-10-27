@@ -170,6 +170,13 @@ def write_reports(report: Report, directory: Path) -> Path:
         for c in report.cover_additions
     )
     cover_section = f"<h2>Cover changes</h2><ul>{cover_changes}</ul>" if cover_changes else ""
+    recovery_changes = "".join(
+        f"<li>{esc(c.created_at)} · Selected {'original' if c.original else 'previously approved revision'} <code>{esc(c.revision_sha256)}</code><p>Previous current artifact quarantine, if present: {esc(c.quarantine_path)}.</p></li>"
+        for c in report.recovery_changes
+    )
+    recovery_section = (
+        f"<h2>Recovery history</h2><ul>{recovery_changes}</ul>" if recovery_changes else ""
+    )
     page = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:">
@@ -185,6 +192,7 @@ def write_reports(report: Report, directory: Path) -> Path:
 {accessibility_html(report)}
 <h2>Metadata changes</h2><ul>{changes}</ul>
 {cover_section}
+{recovery_section}
 <h2>Inspection findings</h2><ul>{findings}</ul>
 <h2>Preservation</h2><p>{len(report.inspection.resource_hashes)} resources fingerprinted · {len(report.inspection.spine)} spine documents · {report.inspection.text_characters:,} text characters inventoried</p>
 <p>Artifact SHA-256: <code>{esc(report.artifact_sha256 or "No approved artifact")}</code></p>

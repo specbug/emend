@@ -75,6 +75,7 @@ Keep reader compatibility claims tied to actual device evidence.
   checks, bounded uploads, isolated evidence, and core mutation gates. GET must
   never trigger edits, provider calls, publishing or other user actions.
 - `reports.py`, `library.py`, `assets/`, `cli.py`: local reports, overview, and CLI.
+- `recovery.py`: restore only the original or a previously approved retained revision. Revoke approval before replacing bytes, quarantine the previous current artifact, and rerun current gates. Carry `recovery_changes` through subsequent edits.
 - `reader_export.py`: byte-verified mounted-folder delivery. Keep native atomic
   no-clobber behavior, directory-descriptor checks, retry reconciliation and
   shared publication gates; never replace unknown files or infer device support.
