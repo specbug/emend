@@ -1,5 +1,47 @@
 # Validation evidence
 
+## Local Apple silicon verification — 2026-10-27
+
+The documented `scripts/verify-local.sh --require-ace` run passes **519 tests
+with no skips** on macOS 26.6.2 arm64, using Python 3.12.16, Java 21,
+EPUBCheck 5.3.0, the existing Calibre 9.16 installation, rclone 1.75.2,
+Playwright 1.64.0 / Chromium 156, and Ace 1.4.6 / Puppeteer Chrome 148.
+Lint, formatting, source distribution and wheel builds pass.
+
+The initial run passed 518 cases and exposed a timezone-dependent assertion in
+the real Calibre EPUB 2 integration. Calibre interpreted the date-only March 4
+metadata as local midnight and serialized it as March 3 at 18:30 UTC on the
+India-timezone host. The disposable Calibre fixture now explicitly sets `TZ=UTC`;
+the exact date assertion is unchanged. All three Calibre integration cases pass
+with an India-timezone parent process, followed by the complete passing run.
+No EPUB editing or publication behavior was changed.
+
+Actual tools exercise EPUB 2/3 repair, metadata and cover edits, typography
+application, visual/reading evidence, revision recovery, native macOS no-clobber
+export, Calibre import/retry, rich-library backup and restore, and rclone local
+transport. All five official Ace cases pass, including clean audits, missing-alt
+findings and revalidation. After repairing a stalled Puppeteer browser install
+from its complete downloaded archive, these five cases also pass with the normal
+Puppeteer cache and no executable override. The full run used the same Chrome
+archive extracted separately.
+
+The built wheel was installed into a separate environment using frozen cached
+dependencies, then exercised from outside the repository through the CLI. A
+synthetic accessible EPUB passed required EPUBCheck and Ace audits, revalidation,
+reading review and paginated browser review. Repeated folder export and Calibre
+publication were idempotent. A complete backup verified and restored into a new
+library, which Calibre reopened; the restored EPUB and preserved original matched
+the input SHA-256. Default workspace initialization and `doctor` also passed.
+
+The browser tests verify import, cover application and recovery, session/security
+boundaries and desktop/phone widths. Review and recovery screenshots at 1280 px
+and 390 px were inspected: readable layout, wrapping hashes and no horizontal
+overflow. These are synthetic fixtures and disposable libraries; personal books,
+authenticated Drive, live providers/Meta, manual accessibility and X4 Pro hardware
+remain separate acceptance checks.
+
+## Earlier Linux evidence
+
 Validated in the Linux cloud development environment with Python 3.12, Java 21, and the official EPUBCheck 5.3.0 distribution.
 
 ## Edition discovery and cover review (0.3)

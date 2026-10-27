@@ -28,6 +28,10 @@ def real_calibre(tmp_path, config, monkeypatch):
         assert (folder / name).is_file(), f"Missing real Calibre tool: {name}"
     monkeypatch.setenv("CALIBRE_CONFIG_DIRECTORY", str(tmp_path / "calibre-config"))
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    # Calibre interprets EPUB 2 date-only metadata in the local timezone, then
+    # serializes it as UTC. Keep publication-date assertions independent of the
+    # host timezone by making the disposable test environment explicit.
+    monkeypatch.setenv("TZ", "UTC")
     config.tools.calibre_bin = folder
     config.publish.calibre_library = tmp_path / "Calibre Library"
     config.publish.calibre_library.mkdir()

@@ -11,14 +11,31 @@ Use Python 3.12+, uv, Java 21, Node.js 22+, and rclone. Calibre can be installed
 normally in `/Applications/calibre.app`, or downloaded into an isolated cache:
 
 ```sh
+brew install openjdk@21 rclone
+export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"
+export PATH="$JAVA_HOME/bin:$PATH"
 export EMEND_TOOLS_DIR="$HOME/Library/Caches/emend/tools"
 export EMEND_ACE_DIR="$HOME/Library/Caches/emend/ace"
+export PUPPETEER_CACHE_DIR="$HOME/Library/Caches/emend/puppeteer"
 export UV_CACHE_DIR="$HOME/Library/Caches/emend/uv"
 bash scripts/setup-cloud.sh
 uv sync --frozen --extra visual
 uv run --extra visual playwright install chromium
 bash scripts/setup-ace.sh
 ```
+
+Keep these exports in the shell used for verification. Homebrew's Java 21 is
+keg-only, so `/usr/bin/java` alone may still report that no runtime is installed.
+If npm reports that Puppeteer's install script was blocked, explicitly run the
+browser installer for this installed dependency:
+
+```sh
+(cd "$EMEND_ACE_DIR/node_modules/puppeteer" && node install.mjs)
+```
+
+Complete setup steps sequentially: `setup-cloud.sh` syncs the base Python
+environment, so run the visual dependency sync after it, before installing or
+running Playwright.
 
 For the isolated official Calibre build (checksum-verified, no `/Applications`
 installation), also run:
