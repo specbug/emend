@@ -113,3 +113,6 @@ def browser_config(config):
     elif not os.environ.get("EMEND_TEST_PLAYWRIGHT"):
         pytest.skip("Set EMEND_TEST_CHROMIUM or EMEND_TEST_PLAYWRIGHT=1 for browser integration")
     return config
+
+
+from tests.test_typography import fake_capture  # noqa: E402, F401

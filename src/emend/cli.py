@@ -737,6 +737,37 @@ def typography_trial_command(
         fail(exc)
 
 
+@app.command("apply-typography")
+def apply_typography_command(
+    book_id: str,
+    trial: Annotated[str, typer.Option("--trial")],
+    approve: Annotated[
+        bool, typer.Option(help="Confirm you reviewed the complete trial and its CSS/scope.")
+    ] = False,
+    all_spine: Annotated[
+        bool,
+        typer.Option(
+            help="Also apply to unsampled spine documents; inspect special content first."
+        ),
+    ] = False,
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Apply the exact CSS from a reviewed trial; preserve text and validate before activation."""
+    from emend.typography_apply import TypographyRejectedError, apply_typography
+
+    try:
+        result = apply_typography(
+            book_id, load_config(config), trial_id=trial, approve=approve, all_spine=all_spine
+        )
+        typer.echo(result.model_dump_json(indent=2) if as_json else report_text(result))
+    except TypographyRejectedError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 @app.command("typography-trials")
 def typography_trials_command(
     book_id: str,

@@ -263,6 +263,7 @@ def apply_proposals(
                     ],
                     cover_changes=previous.cover_changes,
                     repair_changes=previous.repair_changes,
+                    typography_changes=previous.typography_changes,
                     metadata_changes=previous.metadata_changes
                     + [
                         MetadataChange(

@@ -63,7 +63,9 @@ Keep reader compatibility claims tied to actual device evidence.
 - `validation.py`, `revalidation.py`, `accessibility.py`, `visual.py`,
   `pagination.py`: validators, refresh of current-artifact approval, Ace evidence
   parsing, and advisory browser review.
-- `typography.py`: explicit numeric browser-only trials; the current/trial
+- `typography.py`, `typography_apply.py`: explicit numeric trials and approved
+  CSS application. Keep `typography_changes` through later edits; verify stylesheet
+  declarations independently and preserve all text/unrelated resources. The current/trial
   captures must share one verified snapshot and evidence must remain hash-checked.
 - `reports.py`, `library.py`, `assets/`, `cli.py`: local reports, overview, and CLI.
 - `publish.py`, `backup.py`: delivery and full-library backup/restore.
