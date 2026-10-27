@@ -155,7 +155,7 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
                 hidden={"expected_report": row["report_path"] or ""},
             )
         else:
-            body += "<p>No retained source is available. Restore a verified Emend backup first.</p>"
+            body += "<p>No retained source is available. Restore preserved source files from your own backup first.</p>"
         return self.page("Recovery", body)
 
     def book(self, book):

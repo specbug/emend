@@ -80,12 +80,21 @@ def test_small_source_requires_recorded_exception(tmp_path, config):
     assert apply(before, review, config, allow_small=True).cover_additions[0].allowed_small
 
 
-@pytest.mark.parametrize("hint", ["fixed", "landmark", "guide"])
+@pytest.mark.parametrize("hint", ["fixed", "fixed-legacy", "fixed-spine", "landmark", "guide"])
 def test_existing_cover_hints_and_fixed_layout_refused(tmp_path, config, hint):
     files = book_files()
     if hint == "fixed":
         files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
             b"</metadata>", b'<meta property="rendition:layout">pre-paginated</meta></metadata>'
+        )
+    elif hint == "fixed-legacy":
+        files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
+            b"</metadata>", b'<meta name="fixed-layout" content="true"/></metadata>'
+        )
+    elif hint == "fixed-spine":
+        files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
+            b'<itemref idref="chapter"',
+            b'<itemref properties="rendition:layout-pre-paginated" idref="chapter"',
         )
     elif hint == "guide":
         files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
@@ -185,3 +194,13 @@ def test_workspace_missing_cover_action(workspace, tmp_path, config):
         == 303
     )
     assert get_report(Store(config.root), before.book_id).cover_additions
+
+
+def test_epub2_legacy_fixed_layout_refused(tmp_path, config):
+    files = book_files("2.0")
+    files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
+        b"</metadata>", b'<meta name="fixed-layout" content="true"/></metadata>'
+    )
+    before, review = prepare(tmp_path, config, files=files)
+    with pytest.raises(ValueError, match="reflowable"):
+        apply(before, review, config)

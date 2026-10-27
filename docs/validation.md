@@ -206,3 +206,40 @@ with only its official-checker case skipped when that opt-in is absent. The
 separate checker-enabled recovery run passed. Reports also expose recovery history.
 Filesystem exhaustion, sudden power loss, and the target Mac remain external
 validation; injected faults and process termination do not certify those cases.
+
+## Complete release verification (0.18)
+
+The repeatable `scripts/verify-local.sh` run passes **511 tests**, with five full
+Ace cases explicitly skipped in this managed cloud browser. Lint, formatting,
+source distribution and wheel builds pass. Real Calibre 9.17.0, EPUBCheck 5.3.0,
+Chromium and rclone were enabled. The official Linux Calibre installer also ran
+successfully using its checksum/size-verified cached distribution.
+
+Two complete workflow cases run EPUB 2 and EPUB 3 through packaging repair,
+fixture-backed metadata research and actual edits, missing-cover creation,
+actual browser typography comparison/application, reading/visual evidence,
+recovery from injected corrupt activation, verified mounted-folder export/retry,
+real Calibre import, rich notes/resources/annotations/custom columns and extra
+files, a complete backup transferred by real rclone to a disposable local remote,
+and restoration reopened through Calibre's API. No personal library, book, Drive
+account or live AI/provider request is involved. Existing integration cases also
+verify multiple ebook formats and rich metadata retention.
+
+A real-browser creation/recovery flow passes at 1280 px and 390 px with no
+horizontal overflow; screenshots were inspected locally. Seven packaging cases
+cover local-header extra fields (including absent central extras), prepended bytes,
+EPUB 2/3 acceptance after repair, and a valid central-directory-only extra field.
+Official EPUBCheck accepts that last case; Emend does not falsely flag it as a
+local-header defect. Engine 3 requires revalidation of earlier approvals.
+
+CI now installs actual Calibre on both Linux and macOS, runs full Ace and browser
+integrations, and builds distributions. Its current checks establish the hosted
+platform result; the final PR remains draft until those checks finish. The Mac
+installer uses the official checksum/size-verified universal DMG in an isolated
+tools directory. Personal Mac/Drive/X4 Pro and publication-quality acceptance
+remain the checks in [the runbook](mac-validation.md).
+
+Final review extended missing-cover refusal to legacy fixed-layout metadata and
+per-spine fixed-layout declarations, sharing the existing pagination classifier.
+The focused checker/browser-enabled cover and pagination suites pass **40 tests**,
+including the three additional refusal cases and legacy EPUB 2 coverage.

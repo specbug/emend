@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from emend import ENGINE_VERSION
 from emend.config import Config
-from emend.inspect import inspect_epub, sha256_file
+from emend.inspect import inspect_epub, local_extra_bytes, sha256_file
 from emend.models import Gate, RepairChange, Report
 from emend.navigation_repair import ACTION as NAV_ACTION
 from emend.navigation_repair import DESCRIPTION as NAV_DESCRIPTION
@@ -45,6 +45,8 @@ class ContainerState(BaseModel):
     position: int = Field(ge=1)
     compression: str
     extra_bytes: int = Field(ge=0)
+    local_extra_bytes: int = Field(default=0, ge=0)
+    header_offset: int = Field(default=0, ge=0)
 
 
 class RepairPlan(BaseModel):
@@ -67,7 +69,7 @@ class RepairPlan(BaseModel):
 def proposed_actions(inspection) -> list[str]:
     errors = {f.code for f in inspection.findings if f.severity == "error"}
     # Never try to rehabilitate unreadable, unsafe, or otherwise damaged containers.
-    return [ACTION] if errors == {"zip.mimetype_order"} else []
+    return [ACTION] if errors and errors <= {"zip.mimetype_order", "zip.mimetype_header"} else []
 
 
 def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
@@ -94,6 +96,8 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
                             mime.compress_type, f"ZIP method {mime.compress_type}"
                         ),
                         extra_bytes=len(mime.extra),
+                        local_extra_bytes=local_extra_bytes(current, mime),
+                        header_offset=mime.header_offset,
                     )
             plan = RepairPlan(
                 id=uuid.uuid4().hex,
@@ -127,7 +131,9 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
                 "<h2>Proposed changes</h2><ul>"
                 f"<li>mimetype entry position: {plan.before.position} → 1.</li>"
                 f"<li>Compression: {esc(plan.before.compression)} → stored.</li>"
-                f"<li>ZIP extra field bytes: {plan.before.extra_bytes} → 0.</li>"
+                f"<li>Central ZIP extra field bytes: {plan.before.extra_bytes} → 0.</li>"
+                f"<li>Local ZIP extra field bytes: {plan.before.local_extra_bytes} → 0.</li>"
+                f"<li>First local-header offset: {plan.before.header_offset} → 0.</li>"
                 "</ul>"
             )
         if plan.links:
