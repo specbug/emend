@@ -831,6 +831,29 @@ def reading_review_command(
         fail(exc)
 
 
+@app.command("review")
+def review_workspace(
+    port: Annotated[
+        int, typer.Option(min=0, max=65535, help="Local port; zero selects an available port.")
+    ] = 8765,
+    config: ConfigOption = None,
+):
+    """Open a local authenticated workspace for inspecting and explicitly approving changes."""
+    from emend.review_ui import ReviewServer
+
+    try:
+        with ReviewServer(load_config(config), port) as server:
+            typer.echo(
+                f"Open this local session URL in your browser:\n{server.entry_url}\nKeep this URL private. Stop the server with Ctrl+C."
+            )
+            try:
+                server.serve_forever(poll_interval=0.2)
+            except KeyboardInterrupt:
+                typer.echo("Review session stopped.")
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 @app.command("library")
 def library_command(
     config: ConfigOption = None,

@@ -70,6 +70,9 @@ Keep reader compatibility claims tied to actual device evidence.
 - `reading_review.py`: bounded offline font/marked-note/direction evidence.
   Keep source observations distinct from glyph coverage, reader behavior and
   accessibility conformance; limits must produce incomplete evidence.
+- `review_ui.py`: loopback-only authenticated workspace. Preserve Host/Origin/CSRF
+  checks, bounded uploads, isolated evidence, and core mutation gates. GET must
+  never trigger edits, provider calls, publishing or other user actions.
 - `reports.py`, `library.py`, `assets/`, `cli.py`: local reports, overview, and CLI.
 - `publish.py`, `backup.py`: delivery and full-library backup/restore.
 - Paths above are relative to `src/emend/`. `tests/epub_factory.py` supplies small

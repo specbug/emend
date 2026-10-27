@@ -49,7 +49,7 @@ Further work includes a broader structural-repair catalog and explicit typograph
 
 ## Implemented: typography comparisons
 
-Version 0.11 adds explicit line-height/paragraph-spacing trials with current/trial screenshots from one verified EPUB snapshot. Numeric settings, CSS and screenshot evidence are retained; incomplete/stale/tampered results remain distinguishable. Trials preserve book bytes, fonts, alignment, and approval state. Version 0.12 adds explicit application of a complete current trial to sampled documents, or all XHTML spine documents with an additional scope flag. Independent XML/resource/text checks, required validators, revision retention and rollback protect the operation. A consolidated review interface is the next implementation step.
+Version 0.11 adds explicit line-height/paragraph-spacing trials with current/trial screenshots from one verified EPUB snapshot. Numeric settings, CSS and screenshot evidence are retained; incomplete/stale/tampered results remain distinguishable. Trials preserve book bytes, fonts, alignment, and approval state. Version 0.12 adds explicit application of a complete current trial to sampled documents, or all XHTML spine documents with an additional scope flag. Independent XML/resource/text checks, required validators, revision retention and rollback protect the operation. Version 0.14 adds a loopback-only authenticated review workspace for import, saved/current evidence, explicit metadata/cover/repair/typography actions, revalidation, configured publication and complete-library backups. It reuses core gates and isolates report content. Mounted-reader delivery and release verification follow.
 
 ## Implemented: offline reading evidence
 
