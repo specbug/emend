@@ -11,12 +11,24 @@ from email.parser import BytesParser
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
+from emend import ENGINE_VERSION
 from emend.config import Config
+from emend.inspect import sha256_file
 from emend.pipeline import get_report, ingest_new
 from emend.reports import report_styles
 from emend.research.discovery import current_source
+from emend.review_guidance import (
+    ACTION_PANELS,
+    CHECK_NAMES,
+    FIX_NAMES,
+    SPACING_PRESETS,
+    STATUS_NAMES,
+    blockers,
+    cover_observation,
+    epubcheck_messages,
+)
 from emend.storage import OperationBusyError, Store
 
 EPUB_UPLOAD_MAX_MIB = 128
@@ -80,12 +92,24 @@ class ReviewApplication:
     def page(self, title, body):
         return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(title)} · Emend</title><style>{report_styles()}
 form {{margin:1rem 0 2rem}} label {{display:block;margin:.5rem 0}} input,select,button {{font:inherit;max-width:100%;padding:.5rem .75rem;border:1px solid var(--rule);border-radius:2px;background:transparent;color:inherit}}
-input[type=checkbox],input[type=radio] {{margin-right:.5rem}} button {{cursor:pointer;background:var(--ink);color:var(--paper);margin-top:.5rem}} button:disabled {{opacity:.5;cursor:default}}
+input[type=checkbox],input[type=radio] {{margin-right:.5rem;min-height:0}} button {{cursor:pointer;background:var(--ink);color:var(--paper);margin-top:.5rem}} button:disabled {{opacity:.5;cursor:default}}
 fieldset {{border:1px solid var(--rule);padding:1rem;margin:1rem 0}} legend {{padding:0 .5rem}} section {{border-bottom:1px solid var(--rule);padding-bottom:1rem}} .error {{color:var(--signal)}} .quiet {{color:var(--muted)}} .controls {{display:flex;gap:1rem;flex-wrap:wrap;align-items:end}} .controls form {{margin-bottom:1rem}}
 a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1px solid var(--rule);margin:1rem 0}} details {{margin:1rem 0}} pre {{white-space:pre-wrap;overflow-wrap:anywhere}} nav {{margin-bottom:2rem}}
-</style></head><body><main><nav><a href="/">Emend library</a></nav>{f'<p role="status">{esc(self.notice)}</p>' if self.notice else ""}{body}<footer>Local review workspace. Originals are preserved; edits and publishing stay explicit. Close the server to end this session.</footer></main></body></html>"""
 
-    def form(self, action, label, fields="", *, book="", digest="", hidden=None):
+.book-steps {{display:flex;gap:1.5rem;flex-wrap:wrap;padding:1.5rem 0;margin:0;border-bottom:1px solid var(--rule)}}
+.book-steps a {{font-size:.875rem}} .book-status {{margin:1.5rem 0 0}}
+section {{scroll-margin-top:1rem}} .optional {{border-bottom:1px solid var(--rule);padding:1rem 0;margin:0}}
+.optional>summary {{font-weight:500;cursor:pointer}} .disclosure-content {{padding:1rem 0 0}}
+.saved-review {{margin:1rem 0}} .saved-review summary {{cursor:pointer}}
+.problems {{list-style:none;padding:0}} .problems>li {{padding:1rem 0;border-bottom:1px solid var(--rule);max-width:none}}
+.problems>li>strong {{font-size:1rem;color:var(--signal)}}
+.action-error {{padding:1.5rem 0;border-bottom:1px solid var(--rule)}} .action-error h2 {{margin:0 0 1rem;color:var(--signal)}}
+button,input,select {{min-height:2.75rem}} button:disabled {{opacity:1;color:var(--muted);background:transparent;cursor:not-allowed}}
+.button-link {{display:inline-block;padding:.75rem 1.5rem;background:var(--ink);color:var(--paper);border-radius:2px;text-decoration:none}}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible {{outline:2px solid var(--signal);outline-offset:4px}}
+</style></head><body><main><nav><a href="/">Emend library</a></nav>{f'<p role="status">{esc(self.notice)}</p>' if self.notice else ""}{body}<footer>Original EPUBs are kept unchanged. Changes are checked before use.</footer></main></body></html>"""
+
+    def form(self, action, label, fields="", *, book="", digest="", hidden=None, disabled=False):
         values = {
             "action": action,
             "csrf": self.csrf,
@@ -96,7 +120,7 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
         inputs = "".join(
             f'<input type="hidden" name="{esc(k)}" value="{esc(v)}">' for k, v in values.items()
         )
-        return f'<form method="post" action="/action">{inputs}{fields}<button type="submit">{esc(label)}</button></form>'
+        return f'<form method="post" action="/action">{inputs}{fields}<button type="submit"{" disabled" if disabled else ""}>{esc(label)}</button></form>'
 
     def library(self, offset=0):
         with self.store.db() as db:
@@ -112,8 +136,15 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
                 title = "; ".join(report.inspection.metadata.get("title", [])) or row["source_name"]
             except (ValueError, OSError):
                 title = row["source_name"]
+            status = (
+                "Checks passed"
+                if row["state"] in {"VALIDATED", "PUBLISHED"}
+                else "Needs attention"
+                if row["state"] in {"FAILED", "REVIEW_REQUIRED"}
+                else "Checks unfinished"
+            )
             items.append(
-                f'<tr><th><a href="/books/{row["id"]}">{esc(title[:2000])}</a></th><td>{esc(row["state"])}</td><td><code>{row["id"][:12]}</code></td></tr>'
+                f'<tr><th><a href="/books/{row["id"]}">{esc(title[:2000])}</a></th><td>{esc(status)}</td></tr>'
             )
         upload = f'''<form method="post" action="/action" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{self.csrf}"><input type="hidden" name="action" value="import"><label>Choose an EPUB <input type="file" name="epub" accept=".epub,application/epub+zip" required></label><p class="quiet">Up to {min(self.config.limits.max_archive_mb, EPUB_UPLOAD_MAX_MIB)} MiB here. Use the inbox/CLI for larger files. Known books are left unchanged.</p><button>Import EPUB</button></form>'''
         paging = (
@@ -125,13 +156,13 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             if self.config.publish.backup_remote:
                 fields += '<label><input type="checkbox" name="upload" value="yes">Upload the verified complete-library snapshot to the configured Drive remote.</label>'
             backup = (
-                "<section><h2>Back up the Calibre library</h2><p>Includes the whole rich library. Quit Calibre and its content server before continuing.</p>"
+                '<details class="optional"><summary>Back up the Calibre library</summary><div class="disclosure-content"><p>Copies the entire library, including book formats, covers, metadata and notes. Backups need Calibre and its Content Server closed. Importing, reviewing and downloading EPUBs do not.</p>'
                 + self.form("backup", "Create verified backup", fields)
-                + "</section>"
+                + "</div></details>"
             )
         return self.page(
             "Library",
-            f'<header><div class="brand">EMEND / REVIEW</div><h1>Your library</h1><p>Inspect evidence, review proposed changes, and publish when the required checks pass.</p></header><section><h2>Import a book</h2>{upload}</section><section><h2>Books</h2><p class="quiet">Recorded states are a snapshot. Opening a book checks its current identity.</p><table><thead><tr><th>Book</th><th>Recorded state</th><th>Identity</th></tr></thead><tbody>{"".join(items)}</tbody></table>{paging if items else "<p>No books yet. Import an EPUB above.</p>"}</section>{backup}',
+            f'<header><div class="brand">EMEND / REVIEW</div><h1>Your library</h1><p>Import an EPUB, resolve any problems, preview it, then download or send your book.</p></header><section><h2>Import a book</h2>{upload}</section><section><h2>Books</h2><p class="quiet">Open a book to see its checks, available fixes and next step.</p><table><thead><tr><th>Book</th><th>Check status</th></tr></thead><tbody>{"".join(items)}</tbody></table>{paging if items else "<p>No books yet. Import an EPUB above.</p>"}</section>{backup}',
         )
 
     def recovery(self, book, reason=""):
@@ -160,58 +191,17 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             body += "<p>No retained source is available. Restore preserved source files from your own backup first.</p>"
         return self.page("Recovery", body)
 
-    def book(self, book):
-        try:
-            saved = self.store.resolve(book)
-            if not saved["report_path"] or Path(saved["report_path"]).stat().st_size > 8 * 1024**2:
-                raise ValueError("No bounded completed report is available.")
-            row, _, digest = current_source(self.store, book, self.config)
-        except (ValueError, OSError) as exc:
-            return self.recovery(book, str(exc))
-        book = row["id"]
-        report = get_report(self.store, book)
-        title = "; ".join(report.inspection.metadata.get("title", [])) or row["source_name"]
-        author = "; ".join(report.inspection.metadata.get("creator", []))
-
-        def form(action, label, fields="", hidden=None):
-            return self.form(action, label, fields, book=book, digest=digest, hidden=hidden)
-
-        gates = "".join(
-            f"<li><strong>{esc(g.name)}: {esc(g.status)}</strong> · {'required' if g.required else 'advisory'}<p>{esc(g.detail)}</p></li>"
-            for g in report.gates
-        )
+    def metadata_options(self, book, digest, form, extra="", opened=False, ready=True):
         body = (
-            f'<header><div class="brand">EMEND / BOOK REVIEW</div><h1>{esc(title)}</h1><p>{esc(author)}</p><p>Recorded state: {esc(row["state"])}</p><code>Current artifact {digest}</code></header><section><h2>Quality checks</h2><ul>{gates}</ul>'
-            + form("revalidate", "Revalidate current EPUB")
-            + "</section>"
-        )
-        body += f'<p><a href="/recovery/{book}">Recover original or retained revision</a></p>'
-        inspection_section = (
-            '<section><h2>Inspect layout and reading details</h2><p>These reviews are advisory. They do not change the EPUB or approve it for a device.</p><div class="controls">'
-            + form("visual", "Capture visual review")
-            + form("reading", "Review fonts and marked notes")
-            + form("repair-plan", "Prepare supported repair plan")
-            + "</div></section>"
-        )
-        typography_section = (
-            "<section><h2>Try typography</h2><p>Browser-only trial. Leave a setting blank to retain its current behavior; fonts and alignment stay authored. Inspect verse, notes and captions.</p>"
-            + form(
-                "typography-trial",
-                "Compare current and trial styling",
-                '<label>Line height, unitless <input type="number" name="line_height" min="1" max="2.4" step="0.05"></label><label>Paragraph gap, em <input type="number" name="paragraph_gap" min="0" max="2" step="0.05"></label><label>Preview layout <select name="layout"><option value="scroll">Scrolling</option><option value="paginated">Paginated</option></select></label>',
-            )
-            + "</section>"
-        )
-        body += (
-            '<section><h2>Metadata and edition evidence</h2><p>Lookups send selected bibliographic metadata to public providers, never EPUB text. Inspect edition evidence before choosing changes.</p><div class="controls">'
+            '<details class="optional"><summary>Book details and cover</summary><div class="disclosure-content"><p>Lookups send selected bibliographic metadata to public providers, never EPUB text. Inspect edition evidence before choosing changes.</p><div class="controls">'
             + form(
                 "research",
-                "Research existing ISBN",
+                "Look up ISBN",
                 '<label>ISBN override, optional <input name="isbn" maxlength="32"></label>',
             )
             + form(
                 "discover",
-                "Find candidate editions",
+                "Search for editions",
                 '<label>Title override, optional <input name="title" maxlength="2000"></label><label>Author override, optional <input name="author" maxlength="2000"></label>',
             )
             + "</div>"
@@ -220,7 +210,11 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             from emend.research.discovery import load_discovery
 
             discovery = load_discovery(self.store, book)
-            current = discovery.artifact_sha256 == digest
+            current = (
+                discovery.artifact_sha256 == digest
+                and discovery.engine_version == ENGINE_VERSION
+                and discovery.policy_sha256 == self.config.metadata.fingerprint()
+            )
             options = "".join(
                 f'<label><input type="radio" name="edition" value="{esc(c.edition.record_id)}" required>{esc(c.edition.title)} · {esc("; ".join(c.edition.creators))} · {esc("; ".join(c.edition.language))} · {esc("; ".join(c.edition.publisher))} · {esc("; ".join(c.edition.date))}<p class="quiet">{esc("; ".join(c.matches + c.differences))}</p></label>'
                 for c in discovery.candidates
@@ -229,7 +223,7 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             if current and options:
                 body += form(
                     "choose-edition",
-                    "Prepare proposals for selected edition",
+                    "Use this edition for suggestions",
                     options,
                     {"discovery": discovery.id},
                 )
@@ -239,8 +233,12 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             from emend.research.service import load_plan
 
             plan = load_plan(self.store, book)
-            current = plan.artifact_sha256 == digest
-            body += f"<p>Metadata plan <code>{esc(plan.id)}</code>: {'current' if current else 'stale; research again'}.</p>"
+            current = (
+                plan.artifact_sha256 == digest
+                and plan.engine_version == ENGINE_VERSION
+                and plan.policy_sha256 == self.config.metadata.fingerprint()
+            )
+            body += f"<p>{'Suggestions for this version' if current else 'The book changed. Look up details again to refresh suggestions.'}</p>"
             if current:
                 options = "".join(
                     f'<label><input type="checkbox" name="proposal" value="{esc(p.id)}"><strong>{esc(p.field)}</strong>: {esc("; ".join(p.before) or "(missing)")} → {esc("; ".join(p.after))}<p class="quiet">{esc(p.reason)} · {esc(p.decision)}</p></label>'
@@ -249,12 +247,17 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
                 if options:
                     body += form(
                         "apply-metadata",
-                        "Apply selected reviewed metadata",
+                        "Save selected book details",
                         options,
                         {"plan": plan.id},
+                        disabled=not ready,
                     )
+                    if not ready:
+                        body += (
+                            "<p>Resolve the required check failures before saving book details.</p>"
+                        )
                 body += form(
-                    "cover-review", "Compare recorded cover candidates", hidden={"plan": plan.id}
+                    "cover-review", "Find covers from these sources", hidden={"plan": plan.id}
                 )
                 body += form(
                     "ai-review",
@@ -271,117 +274,330 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             if plan.provider_errors:
                 body += '<p class="error">Some providers were unavailable; inspect missing evidence before editing.</p>'
         except (ValueError, OSError):
-            body += '<p class="quiet">No usable saved metadata plan.</p>'
-        body += f'<h3>Compare a local cover</h3><form method="post" action="/action" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{self.csrf}"><input type="hidden" name="action" value="cover-local"><input type="hidden" name="book" value="{book}"><input type="hidden" name="artifact" value="{digest}"><label>JPEG or PNG cover, up to 20 MiB <input type="file" name="cover" accept="image/jpeg,image/png" required></label><label>Source/provenance note <input name="source_note" maxlength="2000" required></label><button>Compare local cover</button></form>'
-        body += (
-            "</section>"
-            + inspection_section
-            + typography_section
-            + "<section><h2>Saved review evidence</h2>"
+            body += '<p class="quiet">Look up an ISBN or search for an edition to get suggestions. Nothing changes until you select and save it.</p>'
+        body += f'<h3>Use your own cover</h3><form method="post" action="/action" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{self.csrf}"><input type="hidden" name="action" value="cover-local"><input type="hidden" name="book" value="{book}"><input type="hidden" name="artifact" value="{digest}"><label>JPEG or PNG cover, up to 20 MiB <input type="file" name="cover" accept="image/jpeg,image/png" required></label><label>Source/provenance note <input name="source_note" maxlength="2000" required></label><button>Compare local cover</button></form>'
+        body = body.replace(
+            '<details class="optional">',
+            f'<details class="optional" id="book-details"{" open" if opened else ""}>',
+            1,
         )
+        return body + extra + "</div></details>"
+
+    def book(self, book, error=None, panel=""):
+        try:
+            saved = self.store.resolve(book)
+            if not saved["report_path"] or Path(saved["report_path"]).stat().st_size > 8 * 1024**2:
+                raise ValueError("No bounded completed report is available.")
+            row, source, digest = current_source(self.store, book, self.config)
+        except (ValueError, OSError) as exc:
+            return self.recovery(book, str(exc))
+        book = row["id"]
+        report = get_report(self.store, book)
+        title = "; ".join(report.inspection.metadata.get("title", [])) or row["source_name"]
+        author = "; ".join(report.inspection.metadata.get("creator", []))
+        problems = blockers(row, report, digest, self.config)
+        ready = not problems
+        cover_info = cover_observation(source, report.inspection)
+
+        def form(action, label, fields="", hidden=None, disabled=False):
+            return self.form(
+                action, label, fields, book=book, digest=digest, hidden=hidden, disabled=disabled
+            )
+
+        # Read registered evidence only. GET never starts a scan or changes a book.
         with self.store.db() as db:
             records = db.execute(
                 "SELECT * FROM review_documents WHERE book_id=? ORDER BY created_at DESC LIMIT 100",
                 (book,),
             ).fetchall()
-        seen = set()
+        reviews = {}
         for record in records:
             kind = record["kind"]
-            if kind not in EVIDENCE or kind in seen:
+            if kind not in EVIDENCE or kind in reviews:
                 continue
-            seen.add(kind)
             try:
                 evidence = load_evidence(self.store, book, kind, record["id"])
-                identity = getattr(
-                    evidence, "artifact_sha256", getattr(evidence, "input_sha256", None)
+                current = (
+                    getattr(evidence, "artifact_sha256", getattr(evidence, "input_sha256", None))
+                    == digest
                 )
-                current = identity == digest
-                status = getattr(
+                current = current and evidence.engine_version == ENGINE_VERSION
+                if kind == "repairs":
+                    current = (
+                        current
+                        and evidence.policy_sha256 == self.config.policy_hash()
+                        and evidence.report_sha256 == sha256_file(Path(row["report_path"]))
+                    )
+                reviews[kind] = (evidence, current, None)
+            except (ValueError, OSError) as exc:
+                reviews[kind] = (None, False, str(exc)[:500])
+
+        applied = {
+            "typography-trial": {c.trial_id for c in report.typography_changes},
+            "repairs": {c.plan_id for c in report.repair_changes},
+            "cover-review": {c.review_id for c in [*report.cover_changes, *report.cover_additions]},
+        }
+
+        def review(kind, label):
+            if kind not in reviews:
+                return ""
+            evidence, current, problem = reviews[kind]
+            if problem:
+                return f'<p class="error">{esc(label)} could not be opened. Run this step again.</p><details><summary>Error details</summary><p>{esc(problem)}</p></details>'
+            complete = (
+                getattr(
                     evidence,
                     "status",
                     "complete" if getattr(evidence, "complete", True) else "incomplete",
                 )
-                url = f"/evidence/{book}/{kind}/{record['id']}"
-                body += f'<h3>{esc(kind.replace("-", " ").title())}</h3><p>{"Current artifact" if current else "Stale artifact; capture new evidence"} · {esc(status)} · <code>{esc(record["id"])}</code></p><details><summary>Open saved review</summary><iframe sandbox loading="lazy" src="{url}" title="{esc(kind)}"></iframe><p><a href="{url}" target="_blank" rel="noopener noreferrer">Open full review</a></p></details>'
-                if current and kind == "repairs" and evidence.actions:
-                    options = "".join(
-                        f'<label><input type="checkbox" name="approved_action" value="{esc(a)}" required>{esc(a)}: {esc(evidence.detail)}</label>'
-                        for a in evidence.actions
+                == "complete"
+            )
+            status = (
+                "Applied; kept for reference"
+                if evidence.id in applied.get(kind, set())
+                else "Ready to view"
+                if current and complete
+                else "Incomplete; run this step again"
+                if current
+                else "The book or checks changed; run this step again"
+            )
+            url = f"/evidence/{book}/{kind}/{evidence.id}"
+            return f'<p class="quiet">{esc(label)}: {status}.</p><details class="saved-review"><summary>View {esc(label.lower())}</summary><iframe sandbox loading="lazy" src="{url}" title="{esc(label)}"></iframe><p><a href="{url}" target="_blank" rel="noopener noreferrer">Open full review in a new tab</a></p></details>'
+
+        body = f'<header><div class="brand">EMEND / BOOK</div><h1>{esc(title)}</h1><p>{esc(author)}</p><p class="book-status">{"Needs attention before sending" if problems else "Checks passed · ready to send"}</p></header>'
+        if error:
+            message = (
+                "This book is not ready to send. The problems and next steps are below."
+                if str(error).startswith("Publication blocked:")
+                else error
+            )
+            body += f'<div class="action-error" role="alert"><h2>That step could not finish</h2><p>{esc(message)}</p><a href="#checks">See checks and next steps</a></div>'
+        body += '<nav class="book-steps" aria-label="Book workflow"><a href="#checks">1. Check &amp; fix</a><a href="#preview">2. Preview</a><a href="#send">3. Send</a></nav>'
+        body += '<section id="checks"><h2>1. Check &amp; fix</h2>'
+        issues = ""
+        if ready:
+            body += "<p>The required checks passed. Preview a few pages, then download or send your EPUB.</p>"
+        else:
+            body += "<p>Resolve the problems below before downloading or sending this book. Your original is preserved.</p>"
+            issues += '<ul class="problems">'
+            messages, note = epubcheck_messages(report, self.config.root / "reports" / book)
+            for name, label, detail in problems:
+                issues += f"<li><strong>{esc(label)}</strong>"
+                if name == "structure":
+                    findings = [f for f in report.inspection.findings if f.severity == "error"]
+                    shown_findings = {}
+                    for finding in findings[:20]:
+                        message = (
+                            "The EPUB file needs a packaging repair before readers can reliably open it."
+                            if finding.code in {"zip.mimetype_order", "zip.mimetype_header"}
+                            else finding.message
+                        )
+                        shown_findings.setdefault(message, finding.location)
+                    issues += (
+                        "<ul>"
+                        + "".join(
+                            f"<li>{esc(text)}{f' <span class=quiet>({esc(where)})</span>' if where else ''}</li>"
+                            for text, where in shown_findings.items()
+                        )
+                        + "</ul>"
+                        if findings
+                        else f"<p>{esc(detail)}</p>"
                     )
+                elif name == "epubcheck":
+                    issues += (
+                        "<ul>"
+                        + "".join(
+                            f"<li>{esc(text)}{f' <code>{esc(where)}</code>' if where else ''}</li>"
+                            for text, where in messages
+                        )
+                        + "</ul>"
+                        if messages
+                        else "<p>This check will run after the EPUB structure problems are resolved.</p>"
+                        if any(
+                            g.name == "epubcheck" and g.status == "skipped" for g in report.gates
+                        )
+                        else f"<p>{esc(detail)}</p>"
+                    )
+                    if note:
+                        issues += f'<p class="quiet">{esc(note)}</p>'
+                elif name == "accessibility":
+                    gate = next(g for g in report.gates if g.name == name)
+                    issues += f"<p>{esc(detail)}</p>"
+                    if gate.accessibility:
+                        issues += (
+                            "<ul>"
+                            + "".join(
+                                f"<li>{esc(f.message)}{f' <code>{esc(f.document)}</code>' if f.document else ''}</li>"
+                                for f in gate.accessibility.findings[:20]
+                            )
+                            + "</ul>"
+                        )
+                elif name in {"revalidation", "recovery", "approval"}:
+                    issues += "<p>The checks have not finished. Run checks again to continue.</p>"
+                else:
+                    issues += f"<p>{esc(detail)}</p>"
+                gate = next((g for g in report.gates if g.name == name), None)
+                if gate and gate.status == "unavailable":
+                    if name == "epubcheck":
+                        issues += "<p>Install EPUBCheck on your Mac, then run the checks again. With Homebrew: <code>brew install epubcheck</code>.</p>"
+                    elif name == "accessibility":
+                        issues += (
+                            "<p>Install and configure Ace by DAISY, then run the checks again.</p>"
+                        )
+                    issues += '<p><a href="https://github.com/specbug/emend/blob/main/docs/mac-validation.md" target="_blank" rel="noopener noreferrer">Open tool setup instructions</a></p>'
+                issues += "</li>"
+            issues += "</ul>"
+
+        repair = reviews.get("repairs")
+        missing_tool = any(g.required and g.status == "unavailable" for g in report.gates)
+        if repair and repair[0] is not None and repair[1]:
+            plan = repair[0]
+            if plan.actions:
+                body += "<h3>Available fix</h3><p>Applies this fix, then checks the book again. A rejected change leaves the previous book in place.</p>"
+                body += (
+                    "<details><summary>What will change</summary>"
+                    + f"<p>{esc(plan.detail)}</p></details>"
+                )
+                for action in plan.actions:
                     body += form(
                         "apply-repairs",
-                        "Apply selected reviewed repair",
-                        options,
-                        {"plan": evidence.id},
+                        FIX_NAMES.get(action, "Apply this fix"),
+                        hidden={"plan": plan.id, "approved_action": action},
+                        disabled=missing_tool,
                     )
-                elif current and kind == "typography-trial" and evidence.status == "complete":
-                    body += form(
-                        "apply-typography",
-                        "Apply reviewed trial CSS",
-                        '<p>Default: sampled documents only. Read the comparison and CSS first.</p><label><input type="checkbox" name="all_spine" value="yes">Extend to all XHTML spine documents, including unsampled chapters.</label>',
-                        {"trial": evidence.id},
-                    )
-                elif current and kind == "cover-review" and evidence.candidates:
-                    choices = "".join(
-                        f'<label><input type="radio" name="candidate" value="{esc(c.id)}" required>{esc(c.id)} · {c.width} × {c.height} · {esc(c.source)}</label>'
-                        for c in evidence.candidates
-                    )
-                    choices += '<p>Exceptions below are recorded. Review image resolution and existing cover-page fit first.</p><label><input type="checkbox" name="allow_smaller" value="yes">Allow a smaller source image.</label><label><input type="checkbox" name="allow_aspect_change" value="yes">Allow an aspect-ratio change.</label>'
-                    if evidence.original:
-                        body += form(
-                            "apply-cover", "Apply reviewed cover", choices, {"review": evidence.id}
-                        )
-                    else:
-                        choices += '<p>No declared cover. Adds a new image and first cover page; existing reading resources stay unchanged. Existing cover hints and fixed layouts require manual repair.</p><label><input type="checkbox" name="allow_small" value="yes">Approve a source below 600 px on its short edge after checking readability.</label>'
-                        body += form(
-                            "create-cover",
-                            "Create reviewed missing cover",
-                            choices,
-                            {"review": evidence.id},
-                        )
-            except (ValueError, OSError) as exc:
-                body += (
-                    f'<p class="error">{esc(kind)} evidence unavailable: {esc(str(exc)[:500])}</p>'
+                if missing_tool:
+                    body += "<p>Install the missing checker above before applying this fix.</p>"
+                body += review("repairs", "Proposed fix")
+            elif problems:
+                body += "<h3>No automatic fix for these problems</h3><p>This scan found no fix Emend can safely apply. Use Calibre’s <strong>Edit book → Tools → Check book</strong> to inspect the listed file errors. Save an edited EPUB outside your Calibre library and import that file into Emend for fresh checks.</p><p>Emend currently fixes EPUB packaging and certain broken contents links. It cannot repair every validator or accessibility error.</p>"
+        elif problems and not missing_tool:
+            body += form("repair-plan", "Find available fixes")
+            body += '<p class="quiet">Looks for supported fixes without changing the book. You choose whether to apply them.</p>'
+        if issues:
+            body += "<h3>Problems to resolve</h3>" + issues
+        body += form("revalidate", "Run checks again")
+        body += '<p class="quiet">Use this after fixing tool setup or changing your check settings. Checks can take a minute.</p>'
+        body += '</section><section id="preview"><h2>2. Preview</h2><p>Check how the book looks before sending it. These are browser samples; also inspect it on your reader.</p>'
+        body += f"<h3>{esc(cover_info['title'])}</h3><p>{esc(cover_info['detail'])}</p>"
+        if cover_info["warnings"]:
+            body += "<ul>" + "".join(f"<li>{esc(w)}</li>" for w in cover_info["warnings"]) + "</ul>"
+        body += f'<p><a href="/books/{book}?panel=details#book-details">Review or change the cover</a></p><details><summary>Cover missing on CrossPoint?</summary><p>CrossPoint 2.0.0-rc makes its own cover and thumbnail BMP caches from the EPUB. Emend exports the EPUB, without device-cache sidecars.</p><p>For sleep, choose Settings → Display → Sleep Screen → Cover, then open the book and put the reader to sleep. A Calibre library thumbnail alone does not prove the EPUB contains its cover.</p><p>If a valid embedded cover still does not appear, try the EPUB under a new filename to use a fresh device cache while keeping the old copy and its reading data. This is a diagnostic step, not a device-compatibility guarantee.</p></details>'
+        body += form(
+            "visual",
+            "Preview pages",
+            '<label>View as <select name="layout"><option value="scroll">Scrolling pages</option><option value="paginated">Reader-style pages</option></select></label>',
+        )
+        body += review("visual-review", "Page preview")
+        body += f'<details class="optional" id="spacing"{" open" if panel == "spacing" else ""}><summary>Adjust spacing</summary><div class="disclosure-content"><p>Optional. Choose a starting point and compare it with the current book. A preview does not change the EPUB.</p>'
+        body += form(
+            "typography-trial",
+            "Preview spacing",
+            '<label>Spacing <select name="spacing_preset"><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="roomy">Roomy</option><option value="custom">Custom</option></select></label><details><summary>Custom values</summary><p>Enter either value to override the preset. Leave the other blank to keep the book’s current value.</p><label>Line spacing multiplier <input type="number" name="line_height" min="1" max="2.4" step="0.05"></label><label>Space after paragraphs, in text-size units <input type="number" name="paragraph_gap" min="0" max="2" step="0.05"></label></details><input type="hidden" name="layout" value="scroll">',
+        )
+        body += review("typography-trial", "Spacing comparison")
+        trial = reviews.get("typography-trial")
+        if (
+            trial
+            and trial[0]
+            and trial[1]
+            and trial[0].status == "complete"
+            and trial[0].id not in applied["typography-trial"]
+        ):
+            body += form(
+                "apply-typography",
+                "Apply this spacing",
+                '<p>Applies to the previewed chapters. Review the comparison first.</p><label><input type="checkbox" name="all_spine" value="yes">Also apply to the remaining chapters, which were not previewed.</label>',
+                {"trial": trial[0].id},
+                disabled=not ready,
+            )
+            if not ready:
+                body += "<p>Resolve the required check failures before applying spacing.</p>"
+        body += f'</div></details><details class="optional" id="reading"{" open" if panel == "reading" else ""}><summary>Fonts and footnotes</summary><div class="disclosure-content"><p>Lists font resources and marked note links. It does not certify font appearance or reader behavior.</p>'
+        body += (
+            form("reading", "Check fonts and footnotes")
+            + review("reading-review", "Font and footnote report")
+            + "</div></details></section>"
+        )
+        cover_body = '<div id="cover-review">' + review("cover-review", "Cover comparison")
+        cover = reviews.get("cover-review")
+        if cover and cover[0] and cover[1] and cover[0].candidates:
+            evidence = cover[0]
+            choices = "".join(
+                f'<label><input type="radio" name="candidate" value="{esc(c.id)}" required>{c.width} × {c.height} pixels · {esc(c.source)}</label>'
+                for c in evidence.candidates
+            )
+            if evidence.original:
+                choices += '<details><summary>Allow a size or shape exception</summary><label><input type="checkbox" name="allow_smaller" value="yes">Allow a smaller image.</label><label><input type="checkbox" name="allow_aspect_change" value="yes">Allow a different image shape.</label></details>'
+                cover_body += form(
+                    "apply-cover",
+                    "Apply reviewed cover",
+                    choices,
+                    {"review": evidence.id},
+                    disabled=not ready,
                 )
-        body += "</section><section><h2>Publish approved EPUB</h2><p>Publishing rechecks required gates and current bytes. Delivery is separate from review and editing.</p>"
-        for target, label in [
-            ("calibre", "Publish to configured Calibre library"),
-            ("drive", "Export EPUB to configured Drive remote"),
+            else:
+                choices += '<p>Adds a cover image and first cover page while keeping the existing reading order.</p><details><summary>Allow a small source image</summary><label><input type="checkbox" name="allow_small" value="yes">Approve an image below 600 pixels on its short edge after checking readability.</label></details>'
+                cover_body += form(
+                    "create-cover",
+                    "Create reviewed missing cover",
+                    choices,
+                    {"review": evidence.id},
+                    disabled=not ready or not cover_info["can_add"],
+                )
+                if not cover_info["can_add"]:
+                    cover_body += "<p>This book’s existing cover declaration or layout needs manual review before Emend can add another cover page.</p>"
+        body += self.metadata_options(
+            book, digest, form, cover_body + "</div>", panel == "details", ready=ready
+        )
+        body += '<section id="send"><h2>3. Send your book</h2>'
+        if ready:
+            body += f'<p>Your EPUB passed the required checks. Download it for CrossPoint’s file-transfer page, or use a configured destination below.</p><p><a class="button-link" href="/books/{book}/download">Download EPUB</a></p>'
+        else:
+            body += '<p>Sending is unavailable until the required checks pass. <a href="#checks">See the problems and next steps</a>.</p><button disabled>Download EPUB</button>'
+        for target, label, configured in [
+            ("calibre", "Add to Calibre", self.config.publish.calibre_library),
+            ("drive", "Save EPUB to Drive", self.config.publish.drive_remote),
         ]:
-            configured = (
-                self.config.publish.calibre_library
-                if target == "calibre"
-                else self.config.publish.drive_remote
-            )
             if configured:
-                body += form("publish", label, hidden={"target": target})
-        if not self.config.publish.calibre_library and not self.config.publish.drive_remote:
-            body += '<p class="quiet">No publishing destination configured. Add it to Emend configuration when ready.</p>'
+                body += form("publish", label, hidden={"target": target}, disabled=not ready)
+                if target == "calibre":
+                    body += '<p class="quiet">Close Calibre before this direct import. You can keep it open while reviewing or downloading an EPUB.</p>'
         if self.reader_directory:
-            body += (
-                f"<h3>Reader folder</h3><p>Selected folder: <code>{esc(self.reader_directory)}</code>. Confirm the intended reader/card is mounted. Export verifies files, not hardware or firmware compatibility. Nothing is overwritten; older revisions stay available.</p>"
-                + form(
-                    "reader-export",
-                    "Export approved EPUB to reader folder",
-                    '<label>Filename override, optional <input name="filename" maxlength="240"></label>',
-                )
+            body += f"<p>Reader folder: <code>{esc(self.reader_directory)}</code>. Confirm the reader is mounted, then safely eject after copying.</p>"
+            body += form(
+                "reader-export",
+                "Copy to reader",
+                '<details><summary>Choose a filename</summary><label>Filename <input name="filename" maxlength="240"></label></details>',
+                disabled=not ready,
             )
+        body += '</section><details class="optional" id="technical"><summary>Technical details and recovery</summary><div class="disclosure-content">'
+        body += f"<p>Recorded state: {esc(row['state'])}. Book ID: <code>{book}</code>. Current file: <code>{esc(digest)}</code>.</p>"
+        body += (
+            "<ul>"
+            + "".join(
+                f"<li>{esc(CHECK_NAMES.get(g.name, g.name))}: {esc(STATUS_NAMES[g.status])} ({'required' if g.required else 'optional'})<p>{esc(g.detail)}</p></li>"
+                for g in report.gates
+            )
+            + "</ul>"
+        )
+        body += f'<p><a href="/recovery/{book}">Recover original or retained revision</a></p>'
         with self.store.db() as db:
             receipts = db.execute(
                 "SELECT status,receipt FROM publications WHERE book_id=? ORDER BY updated_at DESC LIMIT 5",
                 (book,),
             ).fetchall()
         if receipts:
-            body += "<h3>Recent delivery receipts</h3>" + "".join(
+            body += "<h3>Recent transfers</h3>" + "".join(
                 f"<details><summary>{esc(r['status'])}</summary><pre>{esc(r['receipt'][:4000])}</pre></details>"
                 for r in receipts
             )
-        body += "</section>"
+        body += "</div></details>"
         return self.page(title, body)
 
     def execute(self, form):
         action = value(form, "action")
         book = value(form, "book")
+        self.notice = ""
         if action == "backup":
             from emend.backup import backup_library
 
@@ -410,7 +626,12 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
         if action == "revalidate":
             from emend.revalidation import revalidate
 
-            revalidate(book, self.config)
+            result = revalidate(book, self.config)
+            self.notice = (
+                "Checks passed. Preview your book or download it below."
+                if result.state == "VALIDATED"
+                else "Checks finished. The remaining problems are listed below."
+            )
         elif action == "reading":
             from emend.reading_review import reading_review
 
@@ -418,11 +639,23 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
         elif action == "visual":
             from emend.visual import visual_review
 
-            visual_review(book, self.config, max_documents=3)
+            result = visual_review(
+                book, self.config, max_documents=3, layout=value(form, "layout", "scroll")
+            )
+            self.notice = (
+                "Page preview saved. Open it under Preview."
+                if result.status == "complete"
+                else "The preview is incomplete. See its details under Preview."
+            )
         elif action == "repair-plan":
             from emend.repairs import prepare_repairs
 
-            prepare_repairs(book, self.config)
+            plan, _ = prepare_repairs(book, self.config)
+            self.notice = (
+                "A supported fix is available under Check & fix. Review it before applying."
+                if plan.actions
+                else "No automatic fix was found. See the problems and manual next steps below."
+            )
         elif action == "apply-repairs":
             from emend.repairs import apply_repairs
 
@@ -432,17 +665,24 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
                 plan_id=value(form, "plan"),
                 approve=form.get("approved_action", []),
             )
+            self.notice = "Fix applied and required checks passed. Preview your book, then download or send it."
         elif action == "typography-trial":
             from emend.typography import TypographySettings, typography_trial
 
-            settings = TypographySettings(
-                line_height=float(value(form, "line_height"))
-                if value(form, "line_height")
-                else None,
-                paragraph_gap=float(value(form, "paragraph_gap"))
-                if value(form, "paragraph_gap")
-                else None,
-            )
+            line, gap = value(form, "line_height"), value(form, "paragraph_gap")
+            if line or gap:
+                settings = TypographySettings(
+                    line_height=float(line) if line else None,
+                    paragraph_gap=float(gap) if gap else None,
+                )
+            else:
+                preset = value(form, "spacing_preset")
+                if preset not in SPACING_PRESETS:
+                    raise ValueError(
+                        "Choose a spacing preset, or enter a custom line or paragraph spacing value."
+                    )
+                line, gap = SPACING_PRESETS[preset]
+                settings = TypographySettings(line_height=line, paragraph_gap=gap)
             typography_trial(
                 book, self.config, settings, max_documents=3, layout=value(form, "layout", "scroll")
             )
@@ -456,6 +696,7 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
                 approve=True,
                 all_spine=value(form, "all_spine") == "yes",
             )
+            self.notice = "Spacing applied and required checks passed. The comparison is kept below for reference."
         elif action == "research" or action == "choose-edition":
             from emend.research.service import research
 
@@ -478,9 +719,12 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
         elif action == "apply-metadata":
             from emend.curation import apply_proposals
 
+            if not form.get("proposal"):
+                raise ValueError("Select at least one suggested change before saving book details.")
             apply_proposals(
                 book, self.config, plan_id=value(form, "plan"), approve=form.get("proposal", [])
             )
+            self.notice = "Book details saved and required checks passed."
         elif action == "cover-review":
             from emend.covers import cover_review
 
@@ -496,6 +740,7 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
                 allow_smaller=value(form, "allow_smaller") == "yes",
                 allow_aspect_change=value(form, "allow_aspect_change") == "yes",
             )
+            self.notice = "Cover updated in the EPUB and required checks passed."
         elif action == "create-cover":
             from emend.cover_create import create_cover
 
@@ -506,6 +751,7 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
                 approve=value(form, "candidate"),
                 allow_small=value(form, "allow_small") == "yes",
             )
+            self.notice = "Cover added to the EPUB and required checks passed."
         elif action == "ai-review":
             from emend.research.ai_review import review_plan
 
@@ -531,13 +777,27 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             results = publish(
                 book, [value(form, "target")], self.config, expected_artifact_sha256=digest
             )
-            if any(r["status"] == "pending" for r in results.values()):
-                raise ValueError(
-                    "Delivery remains pending; inspect its receipt/CLI output before retrying."
-                )
+            pending = [r for r in results.values() if r["status"] == "pending"]
+            if pending:
+                reason = str(
+                    pending[0].get("receipt", {}).get("error", "The transfer did not finish.")
+                )[:1200]
+                if "another calibre program" in reason.lower():
+                    raise ValueError(
+                        "Calibre is open, so direct import could not run. Keep it open and use Download EPUB, then add the file through Calibre’s Add books. Or close Calibre and retry Add to Calibre here."
+                    )
+                raise ValueError(f"The transfer did not finish: {reason}")
+            self.notice = (
+                "Book sent successfully."
+                if any(r["status"] == "published" for r in results.values())
+                else "This version was already sent."
+            )
         else:
             raise ValueError("Unsupported review action.")
-        return f"/books/{book}"
+        panel, anchor = ACTION_PANELS.get(action, ("", ""))
+        return f"/books/{book}" + (
+            f"?panel={panel}#{anchor}" if panel else "#preview" if action == "visual" else ""
+        )
 
 
 class ReviewServer(ThreadingHTTPServer):
@@ -619,6 +879,53 @@ class ReviewHandler(BaseHTTPRequestHandler):
         except OSError:
             pass
 
+    def action_error(self, status, message, form):
+        try:
+            book = value(form or {}, "book")
+            if not book:
+                raise ValueError("No book context")
+            panel, _ = ACTION_PANELS.get(value(form, "action"), ("", ""))
+            page = self.server.app.book(book, error=message, panel=panel)
+        except (ValueError, OSError, KeyError, TypeError):
+            self.error(status, message)
+        else:
+            self.send(status, page)
+
+    def download_epub(self, book):
+        from emend.publish import approved_artifact
+        from emend.reader_export import default_filename
+        from emend.revalidation import snapshot
+
+        app = self.server.app
+        with tempfile.TemporaryDirectory(dir=app.config.root / ".staging") as staging:
+            target = Path(staging) / "approved.epub"
+            with app.store.locked():
+                row, report, source = approved_artifact(app.store, book, app.config)
+                snapshot(source, target, app.config.limits.max_archive_mb * 1024**2)
+                if sha256_file(target) != report.artifact_sha256:
+                    raise ValueError(
+                        "The EPUB changed while preparing the download. Run checks again."
+                    )
+                filename = default_filename(report)
+            try:
+                self.connection.settimeout(30)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/epub+zip")
+                self.send_header("Content-Length", str(target.stat().st_size))
+                self.send_header(
+                    "Content-Disposition",
+                    f"attachment; filename=emend-{row['id'][:12]}.epub; filename*=UTF-8''{quote(filename, safe='')}",
+                )
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.end_headers()
+                with target.open("rb") as stream:
+                    while chunk := stream.read(64 * 1024):
+                        self.wfile.write(chunk)
+            except (OSError, TimeoutError):
+                self.close_connection = True
+
     def do_GET(self):
         if not self.host_ok():
             self.error(403, "Use the local address printed by Emend.")
@@ -647,8 +954,14 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 self.send(200, self.server.app.library(offset))
                 return
             parts = url.path.strip("/").split("/")
+            if len(parts) == 3 and parts[0] == "books" and parts[2] == "download":
+                try:
+                    self.download_epub(parts[1])
+                except (ValueError, OSError) as exc:
+                    self.action_error(400, str(exc)[:2000], {"book": [parts[1]]})
+                return
             if len(parts) == 2 and parts[0] == "books":
-                self.send(200, self.server.app.book(parts[1]))
+                self.send(200, self.server.app.book(parts[1], panel=value(query, "panel")))
                 return
             elif len(parts) == 2 and parts[0] == "recovery":
                 self.send(200, self.server.app.recovery(parts[1]))
@@ -690,6 +1003,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
             if multipart
             else 65536
         )
+        form = None
         try:
             if self.headers.get("Transfer-Encoding"):
                 raise ValueError("Chunked requests are not supported.")
@@ -762,6 +1076,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 return
             try:
                 if upload:
+                    self.server.app.notice = ""
                     action = value(form, "action")
                     if (upload[0], action) not in {("epub", "import"), ("cover", "cover-local")}:
                         raise ValueError("Unsupported upload action.")
@@ -787,13 +1102,15 @@ class ReviewHandler(BaseHTTPRequestHandler):
                                 image=path,
                                 source_note=value(form, "source_note"),
                             )
-                    location = f"/books/{book}"
+                    location = f"/books/{book}" + (
+                        "?panel=details#cover-review" if action == "cover-local" else ""
+                    )
                 else:
                     location = self.server.app.execute(form)
             finally:
                 self.server.app.operation.release()
             self.send(303, location=location)
         except OperationBusyError as exc:
-            self.error(409, str(exc))
+            self.action_error(409, str(exc), form)
         except (ValueError, OSError, KeyError, TypeError, TimeoutError) as exc:
-            self.error(400, str(exc)[:2000])
+            self.action_error(400, str(exc)[:2000], form)

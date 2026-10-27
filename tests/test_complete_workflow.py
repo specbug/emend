@@ -173,6 +173,7 @@ def test_real_browser_missing_cover_and_recovery_at_phone_and_desktop(
             page.evaluate("document.fonts.ready")
             assert page.evaluate("document.documentElement.scrollWidth") == width
             page.screenshot(path=str(tmp_path / f"missing-cover-{width}.png"))
+        page.locator("summary").filter(has_text="Book details and cover").click()
         form = page.locator("form").filter(
             has=page.get_by_role("button", name="Create reviewed missing cover", exact=True)
         )
@@ -180,6 +181,7 @@ def test_real_browser_missing_cover_and_recovery_at_phone_and_desktop(
         form.get_by_role("button", name="Create reviewed missing cover", exact=True).click()
         added = get_report(Store(config.root), before.book_id)
         assert added.cover_additions
+        page.locator("summary").filter(has_text="Technical details and recovery").click()
         page.get_by_role("link", name="Recover original or retained revision", exact=True).click()
         assert page.get_by_role("heading", name="Recover a book", exact=True).is_visible()
         for width in (1280, 390):

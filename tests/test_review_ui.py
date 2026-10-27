@@ -238,9 +238,9 @@ def test_real_browser_import_review_and_evidence_are_usable(workspace, tmp_path,
         )
         book = Store(config.root).books()[0]
         assert book["id"] == sha256_file(source)
-        page.get_by_role("button", name="Review fonts and marked notes", exact=True).click()
-        assert page.get_by_role("heading", name="Reading Review", exact=True).is_visible()
-        page.get_by_text("Open saved review", exact=True).click()
+        page.locator("summary").filter(has_text="Fonts and footnotes").click()
+        page.get_by_role("button", name="Check fonts and footnotes", exact=True).click()
+        page.get_by_text("View font and footnote report", exact=True).click()
         frame = page.frame_locator("iframe")
         assert frame.get_by_role("heading", name="The Quiet Observatory", exact=True).is_visible()
         for width in (1280, 390):
@@ -299,6 +299,7 @@ def test_real_browser_local_cover_can_be_reviewed_before_application(
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
         page.goto(workspace.entry_url)
         page.goto(f"http://127.0.0.1:{workspace.server_port}/books/{before.book_id}")
+        page.locator("summary").filter(has_text="Book details and cover").click()
         page.get_by_label("JPEG or PNG cover, up to 20 MiB").set_input_files(image)
         page.get_by_label("Source/provenance note").fill(
             "Original synthetic fixture, explicitly supplied for this edition"

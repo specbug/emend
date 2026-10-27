@@ -285,3 +285,38 @@ Final review extended missing-cover refusal to legacy fixed-layout metadata and
 per-spine fixed-layout declarations, sharing the existing pagination classifier.
 The focused checker/browser-enabled cover and pagination suites pass **40 tests**,
 including the three additional refusal cases and legacy EPUB 2 coverage.
+
+## Guided book review and CrossPoint cover observations (0.19)
+
+The combined local integration suite passes **543 tests**, with five full Ace
+cases explicitly skipped for the managed browser restriction. Actual EPUBCheck,
+Chromium, Calibre 9.17 and rclone were enabled. Lint, formatting, source distribution
+and wheel builds pass. After final layout/copy refinements, the focused UI,
+workflow and guidance suites pass **47 tests**, with only their two complete
+real-tool workflow cases skipped when the external-tool opt-ins are absent; those
+cases run in the full integration suite above.
+
+The 25 guidance cases include exact blocked-book messages/locations, named repair
+availability, empty/unsupported repair scans, stale report detection, missing
+checker setup and refresh, contextual publication/download errors, Calibre lock
+feedback, named spacing preview/application, disabled metadata edits on failed
+books, and bounded/confined validator evidence. Browser downloads recheck core
+approval/engine/policy and source identities, use a bounded verified snapshot,
+stream the exact approved bytes, require the local session, and leave approval
+and publication state unchanged. Policy/engine/source/snapshot faults refuse the
+download; this is not a device-delivery receipt.
+
+Real Chromium cases exercise both a repairable book (find fix → apply named fix →
+approved download) and unsupported validator failures (exact problems/manual next
+steps, blocked sending, preserved book context). Current screens were inspected
+at 1280 and 390 px, including the available-fix and ready-to-send states; no
+horizontal overflow was detected. Existing security and mutation-approval cases
+remain unchanged apart from following the new labels and optional disclosures.
+
+Cover observations distinguish an embedded declared JPEG/PNG from a separate
+Calibre library thumbnail, report image dimensions and format/extension mismatch,
+and avoid offering missing-cover creation for known incompatible declarations or
+layouts. Original synthetic fixtures cover these observations without changing
+approval. [CrossPoint cover guidance](crosspoint-covers.md) is based on pinned
+2.0.0rc source: that firmware creates its own BMP caches. No X4 Pro hardware,
+private book or device cache was accessed or modified by these tests.
