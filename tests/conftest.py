@@ -115,4 +115,5 @@ def browser_config(config):
     return config
 
 
+from tests.test_review_ui import workspace  # noqa: E402, F401
 from tests.test_typography import fake_capture  # noqa: E402, F401

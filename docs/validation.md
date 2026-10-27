@@ -172,3 +172,9 @@ The complete local suite passes **441 tests**, with five local Ace skips. The 17
 A disposable real-browser run used official EPUBCheck and Calibre 9.17.0: the synthetic embedded-font/note EPUB was imported, reviewed, published to a fresh library, backed up through the workspace, restored to a new directory, and opened/listed by the real Calibre CLI. Desktop/phone views had no horizontal overflow and were inspected visually. No personal library or Drive account was used. The UI uses same-origin referrer policy so browser form origins remain verifiable, while isolated evidence uses no-referrer and sandboxed content. Rejected bodies receive a bounded orderly close to avoid resetting error responses.
 
 Typography application checks compare computed body/paragraph styles and document geometry across captures. Screenshot hashes are retained for saved-file integrity; independent browser rasterization is not required to produce identical PNG bytes.
+
+## Mounted-folder reader export (0.15)
+
+The local full suite passes **463 tests**, with five local Ace CLI skips. The 22 new cases exercise native atomic no-overwrite delivery and idempotency, existing different files/symlinks, unsafe filenames, managed/library/missing destinations, competing writers, changed directories, unavailable rename/fsync, receipt failure/retry reconciliation, policy/revision guards, Unicode filenames, directory-sync limitations, and CLI/workspace use of an explicit destination. Actual exported bytes match the approved EPUB; no source or unrelated destination data is altered.
+
+Linux uses `renameat2(RENAME_NOREPLACE)` and macOS uses `renameatx_np(RENAME_EXCL)`; Darwin's flag/signature were checked against Apple's published XNU header. Hosted macOS/Linux tests exercise their native implementation. A real reader filesystem, mount/unplug behavior, safe eject, filename support, and firmware rendering remain hardware validation, not inferred from a temporary-folder test.

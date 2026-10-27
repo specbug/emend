@@ -427,6 +427,20 @@ Restoration verifies every file and does not overwrite an existing library. A co
 
 **Backup scope:** the complete selected Calibre library folder. Calibre's application-wide preferences/plugins (normally `~/Library/Preferences/calibre` on macOS), rclone credentials, Emend's own state, and data stored only on reading devices are outside this snapshot. Back those up separately with Time Machine or another backup system if needed. Reader annotations are included only when they have actually been saved inside the Calibre library. Google Drive storage is provided by your own account; Emend requires no subscription and operates locally.
 
+## Export approved EPUBs to a mounted reader folder
+
+```sh
+uv run emend export-reader BOOK_ID --to "/Volumes/YOUR_READER/Books"
+# Or enable the same explicit destination in the review workspace:
+uv run emend review --reader-directory "/Volumes/YOUR_READER/Books"
+```
+
+Choose an existing folder on the intended reader/card. This is generic filesystem delivery; Emend does not detect hardware, guess firmware/network protocols, or certify XTEINK compatibility. Confirm the volume is mounted and use the operating system's safe eject before disconnecting.
+
+Export shares publication's required-gate, policy, engine and source/artifact checks. It makes a bounded staging copy, flushes and hashes it, then uses the native macOS/Linux no-overwrite rename operation and verifies the visible result again. Unsupported filesystem operations fail explicitly. Directory identity checks detect a moved/remounted destination during delivery; a copy is not a full Calibre backup.
+
+The default sanitized filename includes the approved artifact's hash, so a new revision gets a distinct file. `--filename NAME.epub` selects a plain filename. Existing exact bytes are verified and reused; different files/symlinks are never overwritten. Older reader revisions are not deleted automatically. Retry reconciles a completed copy even if its database receipt could not be saved. Receipts record point-in-time byte verification, not continuing remote integrity or power-loss durability. A disconnected volume may retain a hidden `.emend-*.part` file for manual cleanup.
+
 ## Optional individual EPUB exports to Drive
 
 This is a separate feature from full library backup. Set `publish.drive_remote: gdrive:Emend/curated`, then:

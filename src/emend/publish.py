@@ -140,34 +140,10 @@ def publish(
     store = Store(config.root)
     results = {}
     with store.locked():
-        row = store.resolve(book_id)
+        row, report, artifact = approved_artifact(
+            store, book_id, config, expected_artifact_sha256=expected_artifact_sha256
+        )
         book_id = row["id"]
-        report = get_report(store, book_id)
-        if (
-            expected_artifact_sha256 is not None
-            and report.artifact_sha256 != expected_artifact_sha256
-        ):
-            raise ValueError("Publication page is stale; review the current artifact first.")
-        if row["state"] not in {"VALIDATED", "PUBLISHED"} or report.state != "VALIDATED":
-            raise ValueError("Publication blocked: this book has not passed its required gates.")
-        if report.policy_sha256 != config.policy_hash() or report.engine_version != ENGINE_VERSION:
-            raise ValueError(
-                "Quality policy or engine changed. Run emend revalidate before publishing."
-            )
-        if any(g.required and g.status != "passed" for g in report.gates):
-            raise ValueError("Publication blocked: required checks are incomplete.")
-        artifact = config.root / "curated" / f"{book_id}.epub"
-        original = config.root / "originals" / f"{book_id}.epub"
-        if (
-            report.book_id != book_id
-            or not report.artifact_sha256
-            or report.inspection.source_sha256 != report.artifact_sha256
-            or not artifact.is_file()
-            or not original.is_file()
-            or sha256_file(artifact) != report.artifact_sha256
-            or sha256_file(original) != book_id
-        ):
-            raise ValueError("Publication blocked: source or artifact hash mismatch.")
         for target in dict.fromkeys(targets):
             try:
                 key = target_key(target, config)
@@ -209,3 +185,35 @@ def publish(
             artifact,
         )
     return results
+
+
+def approved_artifact(
+    store: Store, book_id: str, config: Config, *, expected_artifact_sha256: str | None = None
+):
+    """Verify publication policy and bytes. Caller must hold the operation lock."""
+    row = store.resolve(book_id)
+    book_id = row["id"]
+    report = get_report(store, book_id)
+    if expected_artifact_sha256 is not None and report.artifact_sha256 != expected_artifact_sha256:
+        raise ValueError("Publication page is stale; review the current artifact first.")
+    if row["state"] not in {"VALIDATED", "PUBLISHED"} or report.state != "VALIDATED":
+        raise ValueError("Publication blocked: this book has not passed its required gates.")
+    if report.policy_sha256 != config.policy_hash() or report.engine_version != ENGINE_VERSION:
+        raise ValueError(
+            "Quality policy or engine changed. Run emend revalidate before publishing."
+        )
+    if any(g.required and g.status != "passed" for g in report.gates):
+        raise ValueError("Publication blocked: required checks are incomplete.")
+    artifact = config.root / "curated" / f"{book_id}.epub"
+    original = config.root / "originals" / f"{book_id}.epub"
+    if (
+        report.book_id != book_id
+        or not report.artifact_sha256
+        or report.inspection.source_sha256 != report.artifact_sha256
+        or not artifact.is_file()
+        or not original.is_file()
+        or sha256_file(artifact) != report.artifact_sha256
+        or sha256_file(original) != book_id
+    ):
+        raise ValueError("Publication blocked: source or artifact hash mismatch.")
+    return row, report, artifact

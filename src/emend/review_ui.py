@@ -64,8 +64,11 @@ def load_evidence(store, book, kind, identifier):
 
 
 class ReviewApplication:
-    def __init__(self, config):
+    def __init__(self, config, reader_directory=None):
         self.config = config
+        self.reader_directory = (
+            Path(reader_directory).expanduser() if reader_directory is not None else None
+        )
         self.store = Store(config.root)
         self.token = secrets.token_urlsafe(32)
         self.csrf = secrets.token_urlsafe(32)
@@ -317,6 +320,15 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
                 body += form("publish", label, hidden={"target": target})
         if not self.config.publish.calibre_library and not self.config.publish.drive_remote:
             body += '<p class="quiet">No publishing destination configured. Add it to Emend configuration when ready.</p>'
+        if self.reader_directory:
+            body += (
+                f"<h3>Reader folder</h3><p>Selected folder: <code>{esc(self.reader_directory)}</code>. Confirm the intended reader/card is mounted. Export verifies files, not hardware or firmware compatibility. Nothing is overwritten; older revisions stay available.</p>"
+                + form(
+                    "reader-export",
+                    "Export approved EPUB to reader folder",
+                    '<label>Filename override, optional <input name="filename" maxlength="240"></label>',
+                )
+            )
         with self.store.db() as db:
             receipts = db.execute(
                 "SELECT status,receipt FROM publications WHERE book_id=? ORDER BY updated_at DESC LIMIT 5",
@@ -433,6 +445,21 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
             from emend.research.ai_review import review_plan
 
             review_plan(book, self.config, plan_id=value(form, "plan"))
+        elif action == "reader-export":
+            from emend.reader_export import export_reader
+
+            if not self.reader_directory:
+                raise ValueError(
+                    "Start the workspace with --reader-directory for mounted-folder delivery."
+                )
+            result = export_reader(
+                book,
+                self.reader_directory,
+                self.config,
+                filename=value(form, "filename") or None,
+                expected_artifact_sha256=digest,
+            )
+            self.notice = f"EPUB bytes verified: {result['receipt']['directory']}/{result['receipt']['filename']}. Use the operating system's safe eject before disconnecting."
         elif action == "publish":
             from emend.publish import publish
 
@@ -451,8 +478,8 @@ a,p,summary {{overflow-wrap:anywhere}} iframe {{width:100%;height:40rem;border:1
 class ReviewServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, config: Config, port=0):
-        self.app = ReviewApplication(config)
+    def __init__(self, config: Config, port=0, reader_directory=None):
+        self.app = ReviewApplication(config, reader_directory)
         super().__init__(("127.0.0.1", port), ReviewHandler)
 
     @property
