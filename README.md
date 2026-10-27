@@ -63,14 +63,44 @@ Keep the other generated settings, or omit them to use their defaults. Paths can
 ```sh
 uv sync --frozen --extra visual
 uv run --extra visual playwright install chromium
-uv run emend review
+uv run --extra visual emend review
 ```
 
 Open the session URL printed in the terminal. The workspace binds only to `127.0.0.1`; keep that URL private and stop the server with Ctrl+C. Use `--port 0` to select an available port. No separate web account or subscription is needed.
 
-Import an EPUB (up to 128 MiB here, or your configured archive limit if lower; use the inbox/CLI for larger books), inspect current quality gates, research/select metadata and editions, compare/apply covers, prepare/apply supported repairs, compare/apply typography, and open visual/reading evidence. Each edit/publishing action is explicit and uses the same integrity/approval checks as the CLI. Local JPEG/PNG cover uploads accept a provenance note and are bounded to 20 MiB. Known EPUB uploads leave existing curated books unchanged.
+Import an EPUB (up to 128 MiB, or your configured archive limit if lower).
+Known books open without resetting their curated edits. Each book follows three steps:
 
-Configured Calibre/Drive destinations appear as publishing actions. Complete Calibre backups require confirming that Calibre and other writers are closed. Long checks/transfers may take minutes; let the submitted action finish before retrying. The workspace rejects stale forms, isolates saved reports, and checks local-session/CSRF/origin evidence before actions. It serves registered review evidence, not arbitrary files or EPUB scripts. The CLI remains available for recovery and advanced inspection.
+1. **Check & fix:** see the actual validator errors and available supported fixes.
+   Use **Find available fixes**, then explicitly apply a named repair such as
+   **Fix EPUB packaging**. An empty repair scan explains that manual editing is
+   needed; it never claims the book was fixed. Missing checkers have setup guidance.
+2. **Preview:** inspect page samples. Optional sections contain spacing comparisons,
+   font/footnote checks, edition research and cover changes. Spacing presets only
+   create a comparison; **Apply this spacing** is a separate explicit action.
+3. **Send:** download the approved EPUB for CrossPoint's file-transfer page, or
+   use configured Calibre/Drive/reader-folder destinations. Sending controls stay
+   disabled while required checks are unresolved. Errors keep you on the book page
+   with the blockers and next steps visible.
+
+**Download EPUB** rechecks the same approval, policy, engine and identity gates as
+publication, then streams a hash-verified bounded snapshot. It does not call Calibre,
+change the book's approval, or record a completed device delivery. Calibre can stay
+open for import, review, preview and download. Direct **Add to Calibre** still uses
+`calibredb` and needs Calibre closed; a lock error explains the download/GUI-import
+alternative. Complete-library backup is a separate collapsed option that requires
+closing Calibre and other writers before taking the snapshot.
+
+The cover check inspects the image declared inside the EPUB, rather than assuming
+Calibre's separate library thumbnail is embedded. It reports absent/unsupported
+cover declarations, format/extension mismatches and available JPEG/PNG dimensions.
+These observations are advisory, not device certification. See
+[CrossPoint covers](docs/crosspoint-covers.md) for library-grid/sleep troubleshooting.
+
+The workspace binds to loopback with session/CSRF/origin/Host checks and isolated
+saved reports. GET never starts lookups, edits or checks. Long checks may take a
+minute; let the submitted action finish before retrying. The CLI remains available
+for larger imports, recovery and advanced inspection.
 
 ## Inspect and import an EPUB
 

@@ -71,6 +71,7 @@ Keep reader compatibility claims tied to actual device evidence.
 - `reading_review.py`: bounded offline font/marked-note/direction evidence.
   Keep source observations distinct from glyph coverage, reader behavior and
   accessibility conformance; limits must produce incomplete evidence.
+- `review_guidance.py`: bounded, read-only user guidance and embedded-cover observations. UI readiness is advisory; downloads and transfers must still use authoritative core gates.
 - `review_ui.py`: loopback-only authenticated workspace. Preserve Host/Origin/CSRF
   checks, bounded uploads, isolated evidence, and core mutation gates. GET must
   never trigger edits, provider calls, publishing or other user actions.
