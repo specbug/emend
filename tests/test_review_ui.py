@@ -311,3 +311,70 @@ def test_real_browser_local_cover_can_be_reviewed_before_application(
         page.get_by_role("button", name="Apply reviewed cover", exact=True).click()
         assert get_report(Store(browser_config.root), before.book_id).cover_changes
         browser.close()
+
+
+@pytest.mark.parametrize("archive_limit, displayed", [(256, 128), (1, 1)])
+def test_upload_limit_display_and_request_bound(workspace, config, archive_limit, displayed):
+    config.limits.max_archive_mb = archive_limit
+    cookie = login(workspace)
+    assert f"Up to {displayed} MiB here." in request(workspace, headers={"Cookie": cookie})[2]
+    status, _, body = request(
+        workspace,
+        "/action",
+        "POST",
+        b"",
+        {
+            "Cookie": cookie,
+            "Origin": f"http://127.0.0.1:{workspace.server_port}",
+            "Content-Type": "multipart/form-data; boundary=emend-test",
+            "Content-Length": str(displayed * 1024**2 + 65536 + 1),
+        },
+    )
+    assert status == 400 and "Request exceeds" in body
+    assert not Store(config.root).books()
+
+
+@pytest.mark.parametrize("over_limit", [False, True])
+def test_epub_upload_file_boundary(workspace, config, tmp_path, over_limit):
+    import zipfile
+
+    config.limits.max_archive_mb = 1
+    source = write_epub(tmp_path / "boundary.epub")
+    # Add a stored resource to reach the exact file boundary without a large
+    # compressed expansion. ZIP local/central records add 76 + twice the name.
+    name = "EPUB/padding.bin"
+    padding = 1024**2 - source.stat().st_size - 76 - 2 * len(name)
+    with zipfile.ZipFile(source, "a") as archive:
+        archive.writestr(name, b"\0" * padding, compress_type=zipfile.ZIP_STORED)
+    assert source.stat().st_size == 1024**2
+    data = source.read_bytes() + (b"x" if over_limit else b"")
+    boundary = "emend-upload-boundary"
+    body = (
+        (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="csrf"\r\n\r\n'
+            f"{workspace.app.csrf}\r\n--{boundary}\r\n"
+            'Content-Disposition: form-data; name="action"\r\n\r\nimport\r\n'
+            f'--{boundary}\r\nContent-Disposition: form-data; name="epub"; '
+            'filename="boundary.epub"\r\nContent-Type: application/epub+zip\r\n\r\n'
+        ).encode()
+        + data
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
+    status, _, response = request(
+        workspace,
+        "/action",
+        "POST",
+        body,
+        {
+            "Cookie": login(workspace),
+            "Origin": f"http://127.0.0.1:{workspace.server_port}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+    )
+    if over_limit:
+        assert status == 400 and "EPUB exceeds the upload size limit" in response
+        assert not Store(config.root).books()
+    else:
+        assert status == 303, response
+        original = config.root / "originals" / f"{sha256_file(source)}.epub"
+        assert original.read_bytes() == source.read_bytes()
