@@ -5,7 +5,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-24.04, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -36,9 +36,25 @@ jobs:
           UV_CACHE_DIR: ${{ runner.temp }}/uv-cache
           EMEND_CALIBRE_DIR: ${{ runner.temp }}/emend-calibre
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y rclone libegl1 libopengl0 libxcb-cursor0
-          bash scripts/setup-calibre.sh
+          set +e
+          (
+            sudo apt-get update &&
+            sudo apt-get install --no-install-recommends -y rclone libegl1 libopengl0 libxcb-cursor0 &&
+            bash scripts/setup-calibre.sh
+          ) > "$RUNNER_TEMP/emend-calibre-setup.log" 2>&1
+          emend_setup_status=$?
+          set -e
+          cat "$RUNNER_TEMP/emend-calibre-setup.log"
+          if [ "$emend_setup_status" -ne 0 ]; then
+            python3 - <<'PYDIAG'
+          import os
+          from pathlib import Path
+          message = (Path(os.environ["RUNNER_TEMP"]) / "emend-calibre-setup.log").read_text(errors="replace")[-3000:]
+          message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          print(f"::error::Calibre setup failed: {message}")
+          PYDIAG
+            exit "$emend_setup_status"
+          fi
       - run: uv run --extra visual ruff check . && uv run --extra visual ruff format --check .
       - name: Run regression tests with external integrations
         env:

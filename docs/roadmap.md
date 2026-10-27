@@ -47,6 +47,10 @@ Version 0.10 adds reviewed case-only table-of-contents path repairs for EPUB 2 N
 
 Further work includes a broader structural-repair catalog and explicit typography proposals with visual comparisons. Those changes need their own preservation rules and corpus evidence; the container repair does not establish publication-quality layout.
 
+## Implemented: typography comparisons
+
+Version 0.11 adds explicit line-height/paragraph-spacing trials with current/trial screenshots from one verified EPUB snapshot. Numeric settings, CSS and screenshot evidence are retained; incomplete/stale/tampered results remain distinguishable. Trials preserve book bytes, fonts, alignment, and approval state. Applying reviewed styles to EPUBs and a consolidated review interface are the next implementation steps.
+
 ## Next: reader calibration and accessibility depth
 
 Version 0.6 adds structured Ace rule findings to quality reports, raw-evidence fingerprints, conservative handling of incomplete/malformed results, and optional-audit warnings in the library overview. Hosted integration tests exercise DAISY Ace 1.4.6 on original EPUB 2/3 fixtures. Automated audits remain separate from manual conformance review.

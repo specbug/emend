@@ -279,6 +279,20 @@ Review hints identify horizontal overflow, failed HTML images/font faces, and vi
 
 Both layouts are generic Chromium previews. Compact/wide profiles do not emulate the X4 Pro or Apple Books. Obfuscated fonts, fixed layouts, vertical text, footnote interactions, and unsampled content need reader review. Browser/OS font differences can affect pixels; the report records Chromium's version and viewport sizes. Visual review remains separate from required EPUBCheck and accessibility gates.
 
+## Compare typography without changing the EPUB
+
+```sh
+uv run --extra visual emend typography-trial BOOK_ID --line-height 1.6 --paragraph-gap 0.6
+uv run --extra visual emend typography-trial BOOK_ID --line-height 1.7 --layout paginated --profile compact
+uv run emend typography-trials BOOK_ID --json
+```
+
+Open the reported `trial.html` for current/trial screenshots from the **same verified snapshot**, with identical document/profile selections. At least one numeric setting is required: unitless body/p line height (1–2.4), and/or paragraph gap (0–2 em, with the paragraph's preceding block margin set to zero). There is no automatic style recommendation. Fonts, alignment, indentation, and other styles are retained. The generated rules use `!important`; more specific nested rules may still affect individual text. Paragraph rules also affect verse, captions, and notes marked as `p`, so inspect those explicitly.
+
+The default samples up to three representative documents at compact/wide sizes; `--max-documents` accepts 1–9. Both scrolling and paginated previews retain their existing limitations. Each view samples its own document start/middle/end: different flow may change sampled text/page counts. These are not line-aligned comparisons or reader emulation. Each capture retains its own bounded time/screenshot budget, up to two renderer budgets overall.
+
+Trials live under `~/Emend/typography/BOOK_ID/TRIAL_ID/` with numeric settings, the exact generated CSS, and hashed before/after screenshots. `typography-trials --trial TRIAL_ID` verifies saved evidence without launching the browser; it exits `1` for stale/incomplete evidence and `2` for invalid or altered inputs. A later EPUB edit requires a new trial. Creating a trial leaves book bytes, reports, approval, and publishing unchanged; it does not apply CSS to the EPUB.
+
 ## Ask Meta to review uncertain metadata
 
 After `research`, use [Meta Model API](https://dev.meta.ai/products/meta-model-api) for advice on proposals marked `review`:
@@ -414,7 +428,7 @@ On Linux x86_64, install the checksum-verified official Calibre CLI and run thos
 
 ```sh
 bash scripts/setup-calibre.sh
-EMEND_TEST_CALIBRE_BIN=/workspace/.tools/calibre-9.16.0 uv run pytest -q tests/test_calibre_integration.py
+EMEND_TEST_CALIBRE_BIN=/workspace/.tools/calibre-9.17.0 uv run pytest -q tests/test_calibre_integration.py
 ```
 
 Override `EMEND_CALIBRE_DIR` for another installation directory. On macOS, the tests can instead use an existing `/Applications/calibre.app/Contents/MacOS` directory. They isolate Calibre configuration and Qt runs offscreen. With rclone installed, the rich-library test also transfers its backup through a local backend before restoring it. Hosted Linux CI enables these checks; macOS CI explicitly skips them until given Calibre.

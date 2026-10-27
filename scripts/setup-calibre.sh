@@ -7,7 +7,7 @@ if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
   exit 1
 fi
 export UV_CACHE_DIR="${UV_CACHE_DIR:-/workspace/.cache/uv}"
-export EMEND_CALIBRE_DIR="${EMEND_CALIBRE_DIR:-/workspace/.tools/calibre-9.16.0}"
+export EMEND_CALIBRE_DIR="${EMEND_CALIBRE_DIR:-/workspace/.tools/calibre-9.17.0}"
 uv run python - <<'PY'
 import hashlib
 import os
@@ -16,9 +16,9 @@ import urllib.request
 from pathlib import Path
 
 target = Path(os.environ['EMEND_CALIBRE_DIR']).expanduser().absolute()
-archive = target.parent / 'calibre-9.16.0-x86_64.txz'
-expected = '03cd4fda43de23d65405a3c90b924bc4a5c84753e388589d4ca343d9ba561a1d'
-url = 'https://github.com/kovidgoyal/calibre/releases/download/v9.16.0/calibre-9.16.0-x86_64.txz'
+archive = target.parent / 'calibre-9.17.0-x86_64.txz'
+expected = '953e4512a6482848cd803c88b6d942e6afca65dc3b67c7d1353ae048d616de53'
+url = 'https://github.com/kovidgoyal/calibre/releases/download/v9.17.0/calibre-9.17.0-x86_64.txz'
 target.parent.mkdir(parents=True, exist_ok=True)
 
 def valid(path):
@@ -41,6 +41,6 @@ if not valid(archive):
 target.mkdir(exist_ok=True)
 with tarfile.open(archive, 'r:xz') as distribution:
     distribution.extractall(target, filter='data')
-print(f'Official Calibre 9.16.0 installed at {target}')
+print(f'Official Calibre 9.17.0 installed at {target}')
 PY
 CALIBRE_CONFIG_DIRECTORY="$EMEND_CALIBRE_DIR/../calibre-config" QT_QPA_PLATFORM=offscreen "$EMEND_CALIBRE_DIR/calibredb" --version
