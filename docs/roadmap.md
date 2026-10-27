@@ -6,6 +6,12 @@ Calibre-library backups. Version 0.18 completes the planned implementation batch
 The remaining release acceptance is PR review/merge and the personal Mac, Drive
 and XTEINK checks in [the validation runbook](mac-validation.md).
 
+Version 0.19 adds a guided **Check & fix → Preview → Send** workspace, actionable
+validator messages and named supported fixes, gated browser downloads, optional
+spacing presets, contextual failures and embedded-cover observations for the
+CrossPoint handoff. These changes expose the existing preservation rules; they
+do not introduce unrestricted automatic repair or device-cache generation.
+
 ## Implemented workflow
 
 - **Preserve and inspect.** Originals retain their exact bytes and identity hashes.

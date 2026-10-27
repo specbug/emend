@@ -88,8 +88,15 @@ class ReviewApplication:
         self.csrf = secrets.token_urlsafe(32)
         self.operation = threading.Lock()
         self.notice = ""
+        self.notice_book = None
 
-    def page(self, title, body):
+    def take_notice(self, book=None):
+        if self.notice_book != book:
+            return ""
+        message, self.notice = self.notice, ""
+        return message
+
+    def page(self, title, body, notice=""):
         return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(title)} · Emend</title><style>{report_styles()}
 form {{margin:1rem 0 2rem}} label {{display:block;margin:.5rem 0}} input,select,button {{font:inherit;max-width:100%;padding:.5rem .75rem;border:1px solid var(--rule);border-radius:2px;background:transparent;color:inherit}}
 input[type=checkbox],input[type=radio] {{margin-right:.5rem;min-height:0}} button {{cursor:pointer;background:var(--ink);color:var(--paper);margin-top:.5rem}} button:disabled {{opacity:.5;cursor:default}}
@@ -107,7 +114,7 @@ section {{scroll-margin-top:1rem}} .optional {{border-bottom:1px solid var(--rul
 button,input,select {{min-height:2.75rem}} button:disabled {{opacity:1;color:var(--muted);background:transparent;cursor:not-allowed}}
 .button-link {{display:inline-block;padding:.75rem 1.5rem;background:var(--ink);color:var(--paper);border-radius:2px;text-decoration:none}}
 button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible {{outline:2px solid var(--signal);outline-offset:4px}}
-</style></head><body><main><nav><a href="/">Emend library</a></nav>{f'<p role="status">{esc(self.notice)}</p>' if self.notice else ""}{body}<footer>Original EPUBs are kept unchanged. Changes are checked before use.</footer></main></body></html>"""
+</style></head><body><main><nav><a href="/">Emend library</a></nav>{f'<p role="status">{esc(notice)}</p>' if notice else ""}{body}<footer>Original EPUBs are kept unchanged. Changes are checked before use.</footer></main></body></html>"""
 
     def form(self, action, label, fields="", *, book="", digest="", hidden=None, disabled=False):
         values = {
@@ -163,6 +170,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,su
         return self.page(
             "Library",
             f'<header><div class="brand">EMEND / REVIEW</div><h1>Your library</h1><p>Import an EPUB, resolve any problems, preview it, then download or send your book.</p></header><section><h2>Import a book</h2>{upload}</section><section><h2>Books</h2><p class="quiet">Open a book to see its checks, available fixes and next step.</p><table><thead><tr><th>Book</th><th>Check status</th></tr></thead><tbody>{"".join(items)}</tbody></table>{paging if items else "<p>No books yet. Import an EPUB above.</p>"}</section>{backup}',
+            notice=self.take_notice(),
         )
 
     def recovery(self, book, reason=""):
@@ -592,12 +600,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,su
                 for r in receipts
             )
         body += "</div></details>"
-        return self.page(title, body)
+        return self.page(title, body, notice=self.take_notice(book))
 
     def execute(self, form):
         action = value(form, "action")
         book = value(form, "book")
         self.notice = ""
+        self.notice_book = None
         if action == "backup":
             from emend.backup import backup_library
 
@@ -621,6 +630,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,su
             return "/books/" + self.store.resolve(book)["id"]
         row, _, digest = current_source(self.store, book, self.config)
         book = row["id"]
+        self.notice_book = book
         if value(form, "artifact") != digest:
             raise ValueError("This page is stale; reopen the book before taking action.")
         if action == "revalidate":

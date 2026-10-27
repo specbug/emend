@@ -439,3 +439,42 @@ def test_metadata_save_is_disabled_when_required_checks_fail(workspace, tmp_path
     )[2]
     assert '<button type="submit" disabled>Save selected book details</button>' in body
     assert "Resolve the required check failures before saving book details" in body
+
+
+def test_private_notices_are_never_shown_on_unauthenticated_errors(workspace):
+    workspace.app.notice = "Private backup archive location marker"
+    workspace.app.notice_book = None
+    assert "Private backup archive location marker" not in request(workspace)[2]
+    cookie = login(workspace)
+    assert (
+        "Private backup archive location marker"
+        in request(workspace, headers={"Cookie": cookie})[2]
+    )
+    assert (
+        "Private backup archive location marker"
+        not in request(workspace, headers={"Cookie": cookie})[2]
+    )
+
+
+def test_action_notices_belong_to_one_book_and_are_shown_once(workspace, tmp_path, config):
+    from tests.epub_factory import book_files
+
+    first = ingest(write_epub(tmp_path / "first.epub"), config)
+    files = book_files()
+    files["EPUB/chapter.xhtml"] = files["EPUB/chapter.xhtml"].replace(b"Mira", b"Nara")
+    second = ingest(write_epub(tmp_path / "second.epub", files), config)
+    workspace.app.notice = "This change belongs to the first book"
+    workspace.app.notice_book = first.book_id
+    cookie = login(workspace)
+    assert (
+        "This change belongs"
+        not in request(workspace, "/books/" + second.book_id, headers={"Cookie": cookie})[2]
+    )
+    assert (
+        "This change belongs"
+        in request(workspace, "/books/" + first.book_id, headers={"Cookie": cookie})[2]
+    )
+    assert (
+        "This change belongs"
+        not in request(workspace, "/books/" + first.book_id, headers={"Cookie": cookie})[2]
+    )

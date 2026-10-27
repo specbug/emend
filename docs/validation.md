@@ -288,15 +288,15 @@ including the three additional refusal cases and legacy EPUB 2 coverage.
 
 ## Guided book review and CrossPoint cover observations (0.19)
 
-The combined local integration suite passes **543 tests**, with five full Ace
+The initial full local integration verification passes **543 tests**, with five full Ace
 cases explicitly skipped for the managed browser restriction. Actual EPUBCheck,
 Chromium, Calibre 9.17 and rclone were enabled. Lint, formatting, source distribution
 and wheel builds pass. After final layout/copy refinements, the focused UI,
-workflow and guidance suites pass **47 tests**, with only their two complete
+workflow and guidance suites pass **49 tests**, with only their two complete
 real-tool workflow cases skipped when the external-tool opt-ins are absent; those
 cases run in the full integration suite above.
 
-The 25 guidance cases include exact blocked-book messages/locations, named repair
+The 27 guidance cases include exact blocked-book messages/locations, named repair
 availability, empty/unsupported repair scans, stale report detection, missing
 checker setup and refresh, contextual publication/download errors, Calibre lock
 feedback, named spacing preview/application, disabled metadata edits on failed
@@ -320,3 +320,7 @@ layouts. Original synthetic fixtures cover these observations without changing
 approval. [CrossPoint cover guidance](crosspoint-covers.md) is based on pinned
 2.0.0rc source: that firmware creates its own BMP caches. No X4 Pro hardware,
 private book or device cache was accessed or modified by these tests.
+
+Completion notices are now scoped to their book and consumed once. Generic and
+unauthenticated error pages never display a private backup/transfer notice; two
+regression cases cover that boundary and cross-book message reuse.
