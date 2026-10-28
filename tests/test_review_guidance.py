@@ -65,7 +65,7 @@ def test_unsupported_fix_explains_manual_next_step(workspace, tmp_path, config):
     assert post(workspace, cookie, fields(workspace, before, "repair-plan"))[0] == 303
     body = request(workspace, "/books/" + before.book_id, headers={"Cookie": cookie})[2]
     assert "No automatic fix for these problems" in body
-    assert "Edit book → Tools → Check book" in body
+    assert "Tools → Check book" in body
     assert "Element &lt;bad&gt; is not allowed here." in body
     assert "Fix EPUB packaging" not in body and "Fix contents links" not in body
     assert get_report(Store(config.root), before.book_id) == before

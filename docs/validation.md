@@ -1,5 +1,20 @@
 # Validation evidence
 
+## Calibre and EPUBCheck disagreement — 2026-10-28
+
+An original synthetic EPUB 2 fixture containing a heading/list nested inside a
+paragraph and invalid `lang`/`xml:lang` values was checked without changing its
+bytes. Calibre 9.17.0's actual editor `run_checks` returned no problems; official
+EPUBCheck 5.3.0 returned four schema errors for those elements and attributes.
+This reproduces why Calibre's checker cannot serve as confirmation that all
+EPUBCheck errors were resolved. No private book was inspected.
+
+The unsupported-repair guidance now explains that distinction, points to the
+reported source lines, and explains that editing a Calibre file does not refresh
+Emend's preserved copy. Existing UI/guidance tests pass (48 cases, including real
+Chromium); lint and formatting pass. Automatic repair scope and required gates
+are unchanged.
+
 ## Local Apple silicon verification — 2026-10-27
 
 The documented `scripts/verify-local.sh --require-ace` run passes **519 tests
