@@ -9,6 +9,12 @@ First make sure you are comparing the same version of the book. Emend keeps its
 own preserved copy; editing the Calibre library file does not update that copy.
 **Run checks again** checks Emend’s current file, not a newly edited Calibre file.
 
+First try **Find available fixes** in Emend. If it offers **Fix HTML markup**,
+review the proposal and apply it there: you do not need to edit or reimport a copy
+manually. Emend now repairs empty EPUB 2 root language attributes from one
+unambiguous package language and block-only paragraph wrappers inside `body` or
+`div`. Nonempty language values, mixed prose and uncertain nesting remain manual.
+
 ## Invalid language attributes
 
 Open the file named in the error in Calibre’s editor and inspect the reported
@@ -53,7 +59,7 @@ so preview the affected pages afterwards. Do not replace all paragraphs with div
    Calibre library. Import that EPUB into Emend.
 3. Check the new result, then preview the affected pages before sending it.
 
-Saving or reimporting an unchanged file will not fix schema errors. Emend’s
-automatic repair scope currently covers packaging and selected contents links;
-it does not yet repair arbitrary HTML nesting or language attributes. Failed
-required checks continue to block download and publication.
+Saving or reimporting an unchanged file will not fix schema errors. Beyond the
+scoped markup repairs above, Emend supports packaging and selected contents
+links; arbitrary HTML nesting and language attributes still need manual editing.
+Failed required checks continue to block download and publication.

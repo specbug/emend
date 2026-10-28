@@ -23,6 +23,7 @@ STATUS_NAMES = {
 FIX_NAMES = {
     "container.mimetype": "Fix EPUB packaging",
     "navigation.case_paths": "Fix contents links",
+    "xhtml.markup": "Fix HTML markup",
 }
 SPACING_PRESETS = {
     "compact": (1.35, 0.35),

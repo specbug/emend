@@ -12,6 +12,11 @@ spacing presets, contextual failures and embedded-cover observations for the
 CrossPoint handoff. These changes expose the existing preservation rules; they
 do not introduce unrestricted automatic repair or device-cache generation.
 
+Version 0.20 adds reviewed repair of empty EPUB 2 root language attributes and
+block-only paragraph wrappers in EPUB 2/3, through **Find available fixes → Fix
+HTML markup**. Independent tree/resource comparison and required validators
+still gate activation; arbitrary markup repair remains outside this scope.
+
 ## Implemented workflow
 
 - **Preserve and inspect.** Originals retain their exact bytes and identity hashes.
@@ -24,7 +29,7 @@ do not introduce unrestricted automatic repair or device-cache generation.
   never applies edits or promotes approval. Provider failures remain visible.
 - **Apply scoped edits.** Metadata changes, declared JPEG/PNG cover replacement,
   missing-cover creation for supported reflowable EPUB 2/3, container packaging
-  repair, case-only TOC path repair, and reviewed numeric typography application
+  repair, case-only TOC path repair, scoped HTML markup repair, and reviewed numeric typography application
   have independent preservation checks, validation before activation, retained
   revisions and rollback. Missing-cover creation explicitly adds a first cover
   page while preserving old resource bytes and their relative reading order.

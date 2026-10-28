@@ -1,5 +1,28 @@
 # Validation evidence
 
+## Reviewed HTML markup repairs — 0.20
+
+The local suite passes **583 tests**, with five opt-in Ace integrations skipped;
+official EPUBCheck 5.3.0, Calibre 9.17.0, rclone and Chromium are enabled. The final
+UI/guidance/markup subset passes **86 cases**, including the upgrade rescan path.
+Lint, formatting, source distribution and wheel builds pass.
+
+The 38 new original-fixture cases cover EPUB 2 empty root languages, EPUB 2/3
+block-only paragraph wrappers, unchanged local language overrides/prose/IDs/links,
+independent XML/resource comparisons, explicit approval, stale plans, bounded
+discovery and validator/activation rollback. Valid empty EPUB 3 language values,
+ambiguous package languages, mixed prose and uncertain parents stay untouched.
+Official EPUBCheck rejects the defective source fixtures and accepts repaired
+candidates. Chromium exercises reopening an earlier empty repair scan, finding
+the new named fix, applying it and downloading the exact approved bytes. Desktop
+and phone screenshots of the original fixture UI were inspected without
+horizontal overflow. No private books or identifying details are committed as
+fixtures or validation artifacts.
+
+Markup repair preserves stylesheets but can affect element-specific CSS; the
+proposal requires previewing affected pages. Browser/validator success does not
+certify reader-device rendering or accessibility conformance.
+
 ## Calibre and EPUBCheck disagreement — 2026-10-28
 
 An original synthetic EPUB 2 fixture containing a heading/list nested inside a
