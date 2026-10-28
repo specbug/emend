@@ -125,6 +125,31 @@ class RecoveryChange(BaseModel):
     created_at: str
 
 
+class ConvertedImage(BaseModel):
+    manifest_id: str
+    old_href: str
+    new_href: str
+    old_media_type: str
+    new_media_type: str
+    old_sha256: str
+    new_sha256: str
+    reason: str
+
+
+class SkippedImage(BaseModel):
+    manifest_id: str
+    href: str
+    reason: str
+
+
+class ImageConversion(BaseModel):
+    trial_id: str
+    images: list[ConvertedImage]
+    skipped: list[SkippedImage]
+    before_sha256: str
+    after_sha256: str
+
+
 class Report(BaseModel):
     book_id: str
     source_name: str
@@ -141,6 +166,7 @@ class Report(BaseModel):
     repair_changes: list[RepairChange] = Field(default_factory=list)
     typography_changes: list[TypographyChange] = Field(default_factory=list)
     text_size_changes: list[TextSizeChange] = Field(default_factory=list)
+    image_conversions: list[ImageConversion] = Field(default_factory=list)
     cover_additions: list[CoverAddition] = Field(default_factory=list)
     recovery_changes: list[RecoveryChange] = Field(default_factory=list)
     changes: list[str] = Field(default_factory=list)

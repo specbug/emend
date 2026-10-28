@@ -1,5 +1,11 @@
 # Release scope and future work
 
+Version 0.24 adds explicit raster-format conversion in **Refine → Images and
+covers**, with compared baseline/converted pages, checked references and pixels,
+size reporting, retained revisions and rollback. WebP and other eligible static
+rasters become non-interlaced PNG or baseline JPEG. Device rendering on X4 Pro and
+iPad remains pending; resizing, SVG rasterisation and animation are outside scope.
+
 Emend's current milestone is a local, preservation-first EPUB review and curation
 workflow, with explicit edits, inspectable evidence, gated delivery and complete
 Calibre-library backups. Version 0.18 completes the planned implementation batch.

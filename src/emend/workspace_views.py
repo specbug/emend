@@ -427,6 +427,7 @@ class BookView:
         self.applied = {
             "typography-trial": {c.trial_id for c in self.report.typography_changes},
             "text-size-trial": {c.trial_id for c in self.report.text_size_changes},
+            "image-conversion-trial": {c.trial_id for c in self.report.image_conversions},
             "repairs": {c.plan_id for c in self.report.repair_changes},
             "cover-review": {
                 c.review_id for c in [*self.report.cover_changes, *self.report.cover_additions]
@@ -577,10 +578,16 @@ class BookView:
             states["preview"] = ("waiting", "Not rendered")
         pending = [
             entry
-            for entry in (self.latest("typography-trial"), self.latest("text-size-trial"))
+            for entry in (
+                self.latest("typography-trial"),
+                self.latest("text-size-trial"),
+                self.latest("image-conversion-trial"),
+            )
             if entry[0] is not None and entry[1] and entry[0].status == "complete"
         ]
-        if report.typography_changes or report.text_size_changes:
+        if report.image_conversions:
+            states["refine"] = ("done", "Images converted")
+        elif report.typography_changes or report.text_size_changes:
             states["refine"] = (
                 "done",
                 "Text size and spacing adjusted"
@@ -1327,13 +1334,17 @@ class BookView:
         )
 
     def panel_refine(self):
-        changes = [*self.report.text_size_changes, *self.report.typography_changes]
+        changes = [
+            *self.report.text_size_changes,
+            *self.report.typography_changes,
+            *self.report.image_conversions,
+        ]
         # The baseline is where the chain of adjustments starts: no adjustment produced it.
         afters = {c.after_sha256 for c in changes}
         first = next((c for c in changes if c.before_sha256 not in afters), None)
         body = (
             '<div class="split"><div><p>Optional. The checked book is your baseline. Adjust text '
-            "size or spacing, compare page by page, and apply only what reads better. Publisher "
+            "size, spacing or image formats, compare page by page, and apply only what reads better. Publisher "
             "fonts, alignment and indentation stay as they are.</p></div><div>"
             + facts(
                 [
@@ -1353,6 +1364,7 @@ class BookView:
             )
             + "</div></div>"
         )
+        body += self.image_conversion_block()
         body += self.text_size_block()
         body += (
             '<div class="block">'
@@ -1468,6 +1480,61 @@ class BookView:
             "fonts embedded in a book. Choose the base size under Reader Font Size.</p></div>"
         )
         return body
+
+    def image_conversion_block(self):
+        from emend.image_conversion import summary
+
+        body = '<div class="block">' + label("Images and covers")
+        trial, current, problem = self.latest("image-conversion-trial")
+        applied = trial is not None and trial.id in self.applied["image-conversion-trial"]
+        if problem:
+            body += f'<div class="alert"><p>{esc(problem)}</p></div>'
+        if trial is not None and (current or applied):
+            body += f"<h3>{esc(summary(trial.plan))}</h3>"
+            body += self.compare_viewer(
+                "image-conversion-trial",
+                trial,
+                "im",
+                applied,
+                [f"{trial.before_bytes:,} → {trial.after_bytes:,} bytes"],
+                names=("Baseline", "Converted"),
+            )
+            body += (
+                '<ul class="observations">'
+                + "".join(
+                    f"<li>Skipped {esc(s.href)}: {esc(s.reason)}</li>" for s in trial.plan.skipped
+                )
+                + "".join(f"<li>{esc(n)}</li>" for n in trial.plan.notes)
+                + "</ul>"
+            )
+            if not applied:
+                body += self.form(
+                    "apply-image-conversion",
+                    "Apply image conversion",
+                    hidden={"trial": trial.id},
+                    disabled=not current or trial.status != "complete" or self.missing_tool,
+                    cls="btn primary",
+                    working="Converting and checking…",
+                )
+            else:
+                change = next(c for c in self.report.image_conversions if c.trial_id == trial.id)
+                body += self.baseline_restore(change, "this image conversion")
+        else:
+            notes = reader_notes(self.source, self.report.inspection)
+            body += (
+                '<ul class="observations">' + "".join(f"<li>{esc(n)}</li>" for n in notes) + "</ul>"
+            )
+            if any("cannot decode" in n for n in notes):
+                body += self.form(
+                    "image-conversion-trial",
+                    "Compare image conversion",
+                    cls="btn primary",
+                    working="Converting and rendering…",
+                )
+        return (
+            body
+            + '<p class="quiet small">Keeps dimensions, colour profiles, reading text and publisher styles. PNG pixels stay exact; baseline JPEG uses quality 98 with no chroma subsampling and at least 40 dB PSNR. No resizing or grayscale conversion. Nothing is applied during import. Device checks remain pending.</p></div>'
+        )
 
     def spacing_form(self):
         choices = []
@@ -1919,6 +1986,7 @@ def text_size_findings(source, digest, inspection):
 
 def evidence_page_image(store, book, kind, identifier, phase, name):
     """Serve one recorded screenshot only after its registered and recorded hashes match."""
+    from emend.image_conversion import ImageConversionTrial
     from emend.text_size import TextSizeTrial
     from emend.typography import TypographyTrial
     from emend.visual import VisualReview
@@ -1927,12 +1995,17 @@ def evidence_page_image(store, book, kind, identifier, phase, name):
         "visual-review": "visual",
         "typography-trial": "typography",
         "text-size-trial": "text-size",
+        "image-conversion-trial": "image-conversion",
     }
-    models = {"typography-trial": TypographyTrial, "text-size-trial": TextSizeTrial}
+    models = {
+        "typography-trial": TypographyTrial,
+        "text-size-trial": TextSizeTrial,
+        "image-conversion-trial": ImageConversionTrial,
+    }
     row = store.document(book, kind, identifier)
     path = Path(row["path"])
     expected = store.root / folders[kind] / book / identifier
-    if path.parent.resolve() != expected.resolve() or path.stat().st_size > 8 * 1024**2:
+    if path.parent.resolve() != expected.resolve() or path.stat().st_size > 32 * 1024**2:
         raise ValueError("Invalid review location or size.")
     if sha256_file(path) != row["sha256"]:
         raise ValueError("Review changed after registration.")
@@ -1989,11 +2062,16 @@ EVIDENCE = {
     "visual-review",
     "typography-trial",
     "text-size-trial",
+    "image-conversion-trial",
     "reading-review",
 }
 
 
 def load_evidence(store, book, kind, identifier):
+    if kind == "image-conversion-trial":
+        from emend.image_conversion import load_image_conversion_trial
+
+        return load_image_conversion_trial(store, book, identifier)
     if kind == "cover-review":
         from emend.covers import load_cover_review
 
@@ -2040,6 +2118,8 @@ def current_reviews(store, config, row, digest):
                 == digest
             )
             current = current and evidence.engine_version == ENGINE_VERSION
+            if kind == "image-conversion-trial":
+                current = current and evidence.policy_sha256 == config.policy_hash()
             if kind == "repairs":
                 current = (
                     current

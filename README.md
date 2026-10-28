@@ -658,3 +658,36 @@ Version 0.18 uses engine 3 to detect mimetype local extra fields and
 prepended container bytes, and proposes their explicit packaging repair. Existing
 approved books need `revalidate` before publishing with this engine; prepare new
 reviews/trials before applying changes. Other structural defects remain manual.
+
+## Convert images for CrossPoint
+
+**Refine → Images and covers** offers an optional conversion when **On your X4
+Pro** reports unsupported formats such as WebP. Choose **Compare image conversion**,
+inspect baseline versus converted pages and the size/skip summary, then explicitly
+**Apply image conversion**. This runs in the background, works without JavaScript,
+keeps the comparison and offers **Return to the baseline**. Import never applies it.
+
+```sh
+uv run --extra visual emend image-conversion-trial BOOK_ID --json
+uv run emend apply-image-conversion BOOK_ID --trial TRIAL_ID --approve
+```
+
+The trial needs the visual extra and Chromium, like other comparisons. Use
+`--layout scroll` for books the generic paginated browser cannot sample. A trial
+never changes approval. Applying checks its input/plan/screenshot hashes, replays
+and independently verifies the changes, requires EPUBCheck plus your configured
+accessibility gates, then activates or rolls back while retaining rejection evidence.
+Conversion records survive later metadata, cover, spacing, text-size, revalidation
+and recovery actions. Re-ingesting an original intentionally resets its curation.
+
+Dimensions, ICC profiles, text, chapter order, IDs and publisher styles stay intact.
+Lossless/alpha/palette/line-art images become non-interlaced PNG with exact decoded
+pixels; lossy photos become baseline JPEG (quality 98, no subsampling, PSNR ≥ 40 dB).
+References and converted manifest href/media types are updated together. Unsupported
+animations/vectors/large or unreadable images are listed as skipped; unsafe reference
+graphs refuse the whole conversion. No resizing, grayscale conversion or SVG
+rasterisation occurs. See [CrossPoint image behavior and exact limits](docs/crosspoint-typography.md#images-and-covers).
+
+The firmware observations are **from pinned source, not a device test**. X4 Pro and
+iPad acceptance remains pending. Browser previews and validator success do not
+establish hardware compatibility.

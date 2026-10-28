@@ -42,6 +42,8 @@ ACTION_STEPS = {
     "restore-baseline": "refine",
     "text-size-trial": "refine",
     "apply-text-size": "refine",
+    "image-conversion-trial": "refine",
+    "apply-image-conversion": "refine",
     **{
         action: "refine"
         for action in (
@@ -211,8 +213,7 @@ def cover_observation(epub, inspection):
                     "warnings": [
                         "CrossPoint decodes only JPEG, PNG and GIF covers, so the X4 Pro will "
                         "show no cover on its home screen or sleep screen. Apple Books shows it.",
-                        "Emend replaces only JPEG or PNG covers; converting this one needs an "
-                        "edit outside Emend for now.",
+                        "For an eligible raster, compare image conversion under Refine → Images and covers. SVG vectors and skipped rasters stay unchanged.",
                     ],
                 }
             declared = declared_cover(epub, inspection.package_path)
@@ -280,53 +281,106 @@ def cover_observation(epub, inspection):
         }
 
 
-# CrossPoint 2.0.0-rc picks an image decoder by file extension (lib/FsHelpers).
 CROSSPOINT_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif")
-IMAGE_NAMES = {"webp": "WebP", "svg+xml": "SVG", "avif": "AVIF", "bmp": "BMP", "tiff": "TIFF"}
+IMAGE_NAMES = {
+    "image/webp": "WebP",
+    "image/avif": "AVIF",
+    "image/svg+xml": "SVG",
+    "image/jpeg": "JPEG",
+    "image/png": "PNG",
+    "image/gif": "GIF",
+}
 
 
 def reader_notes(epub, inspection):
-    """Advisory X4 Pro observations from the manifest; reader behaviour still needs a device check."""
+    """Bounded source observations, never device-test or approval evidence."""
+    import io
+    import posixpath
+    import warnings
     import zipfile
+    from collections import Counter
+
+    from PIL import Image
 
     from emend.inspect import NS, local_target, parse_xml
 
-    if inspection.blocking or not inspection.package_path:
-        return []
+    if not inspection.package_path:
+        return ["Images can be checked once the package is readable."]
     try:
         with zipfile.ZipFile(epub) as archive:
-            data = archive.read(inspection.package_path)
-        if len(data) > 8 * 1024**2:
-            return []
-        package = parse_xml(data)
-    except (ValueError, OSError, KeyError, zipfile.BadZipFile):
-        return []
-    unsupported, cover = {}, None
-    for item in package.xpath(
-        "opf:manifest/opf:item[starts-with(@media-type, 'image/')]", namespaces=NS
-    ):
-        target = local_target(inspection.package_path, item.get("href", ""))
-        if not target:
-            continue
-        name = target[0]
-        if not name.lower().endswith(CROSSPOINT_IMAGE_EXTENSIONS):
-            subtype = item.get("media-type", "image").split("/", 1)[-1].lower()
-            kind = IMAGE_NAMES.get(subtype, subtype.upper())
-            unsupported[kind] = unsupported.get(kind, 0) + 1
-            if "cover-image" in item.get("properties", "").split():
-                cover = kind
-    notes = []
-    if cover:
-        notes.append(
-            f"The cover is a {cover} image. CrossPoint decodes only JPEG, PNG and GIF, so the "
-            "X4 Pro will show no cover on its home screen or sleep screen."
-        )
-    if unsupported:
-        total = sum(unsupported.values())
-        kinds = ", ".join(f"{count} {kind}" for kind, count in sorted(unsupported.items()))
-        notes.append(
-            f"{total} {'image uses a format' if total == 1 else 'images use formats'} CrossPoint "
-            f"cannot decode ({kinds}). On the X4 Pro they are left out, or replaced by their alt "
-            "text; Apple Books and browsers show them. Emend does not convert images."
-        )
-    return notes
+            if archive.getinfo(inspection.package_path).file_size > 8 * 1024**2:
+                return ["Image notes exceed the package inspection limit."]
+            package = parse_xml(archive.read(inspection.package_path))
+            images = package.xpath(
+                "opf:manifest/opf:item[starts-with(@media-type, 'image/')]", namespaces=NS
+            )
+            if len(images) > 1000:
+                return ["Image notes exceed the 1,000-image inspection limit."]
+            unsupported = Counter()
+            cover_ids = set(
+                package.xpath("opf:metadata/opf:meta[@name='cover']/@content", namespaces=NS)
+            ) | {n.get("id") for n in images if "cover-image" in n.get("properties", "").split()}
+            cover_missing, over, unusual = None, 0, 0
+            for item in images:
+                target = local_target(inspection.package_path, item.get("href", ""))
+                if not target:
+                    continue
+                path = target[0]
+                media = item.get("media-type", "")
+                if posixpath.splitext(path)[
+                    1
+                ].lower() not in CROSSPOINT_IMAGE_EXTENSIONS or media not in {
+                    "image/jpeg",
+                    "image/png",
+                    "image/gif",
+                }:
+                    unsupported[IMAGE_NAMES.get(media, media)] += 1
+                    if item.get("id") in cover_ids:
+                        cover_missing = IMAGE_NAMES.get(media, media)
+                if media == "image/svg+xml" or archive.getinfo(path).file_size > 20 * 1024**2:
+                    continue
+                try:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("error", Image.DecompressionBombWarning)
+                        data = archive.read(path)
+                        with Image.open(io.BytesIO(data)) as image:
+                            over += (
+                                image.width * image.height > 8388608
+                                or image.width > 2048
+                                or image.height > 3072
+                                or image.width * image.height > 2048 * 1536
+                            )
+                            unusual += bool(
+                                image.info.get("progressive")
+                                or image.info.get("progression")
+                                or (image.format == "PNG" and len(data) > 28 and data[28])
+                            )
+                except (
+                    OSError,
+                    ValueError,
+                    Image.DecompressionBombWarning,
+                    Image.DecompressionBombError,
+                ):
+                    continue
+            notes = []
+            if unsupported:
+                total = sum(unsupported.values())
+                kinds = ", ".join(f"{n} {kind}" for kind, n in sorted(unsupported.items()))
+                notes.append(
+                    f"{total} {'image uses a format' if total == 1 else 'images use formats'} CrossPoint cannot decode ({kinds}). On the X4 Pro they are left out, or replaced by their alt text. Compare explicit image conversion under Refine; unsupported or skipped images stay listed."
+                )
+            if cover_missing:
+                notes.append(
+                    f"The cover is a {cover_missing} image. CrossPoint decodes only JPEG, PNG and GIF, so the X4 Pro will show no cover on its home screen or sleep screen."
+                )
+            if over:
+                notes.append(
+                    f"{over} images exceed one or more CrossPoint page/cover/sleep source limits. Conversion keeps dimensions unchanged; device confirmation is pending."
+                )
+            if unusual:
+                notes.append(
+                    f"{unusual} JPEG/PNG images use progressive or interlaced encoding; CrossPoint may blur or omit them. This conversion targets unsupported formats, not existing JPEG/PNG encoding."
+                )
+            return notes
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile):
+        return ["Image notes could not be completed; inspect the quality report."]
