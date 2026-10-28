@@ -103,7 +103,8 @@ Animated/multiframe images, SVG vectors, undecodable images and over-limit image
 are skipped and listed. Fixed layouts, scripts, malformed documents, custom bases,
 unknown reference attributes, embedded style elements referencing converted images,
 and CSS image references outside `url()` refuse the whole plan. A conservative
-local srcset grammar is supported; ambiguous/data source sets remain manual.
+local srcset grammar is supported; ambiguous/data source sets remain manual. CSS
+must be UTF-8 compatible so bytes outside changed URL tokens remain exact.
 
 Limits: 1,000 manifest images, 20 MiB/40 MP per image, 256 MP across converted
 sources, 8 MiB per reference document (CSS 2 MiB), 20,000 grouped references and

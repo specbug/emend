@@ -23,7 +23,7 @@ from emend.image_references import css_preserved, css_rewrite, srcset_urls
 from emend.inspect import NS, inspect_epub, local_target, parse_xml, sha256_file
 from emend.models import ConvertedImage, Gate, ImageConversion, SkippedImage
 from emend.navigation_repair import same_xml, serialize
-from emend.pagination import fixed_layout, validate_layout
+from emend.pagination import check_package, fixed_layout, validate_layout
 from emend.pipeline import atomic_copy, get_report
 from emend.reports import write_reports
 from emend.research.discovery import current_source
@@ -87,6 +87,7 @@ class ImageConversionTrial(BaseModel):
     book_id: str = Field(pattern=r"^[a-f0-9]{64}$")
     artifact_sha256: str
     candidate_sha256: str
+    html_sha256: str = ""
     policy_sha256: str
     engine_version: str
     created_at: str
@@ -368,16 +369,17 @@ def discover(source, inspection):
                 if archive.getinfo(path).file_size > MAX_BYTES:
                     raise ValueError("Image exceeds the 20 MiB conversion limit.")
                 data = archive.read(path)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", Image.DecompressionBombWarning)
+                    with Image.open(io.BytesIO(data)) as header:
+                        if pixels + header.width * header.height > MAX_TOTAL_PIXELS:
+                            raise ValueError("Total converted pixels exceed the 256 MP plan limit.")
                 result, image, alpha, lossless, reason, psnr, extension = encode(data)
-                pixels += image.width * image.height
-                if pixels > MAX_TOTAL_PIXELS:
-                    raise ValueError("Total converted pixels exceed the 256 MP plan limit.")
                 base = posixpath.splitext(path)[0]
                 new_path, index = base + extension, 1
                 while new_path.casefold() in names:
                     new_path = f"{base}.emend-{index}{extension}"
                     index += 1
-                names.add(new_path.casefold())
                 url = urlsplit(href)
                 raw_stem, raw_extension = posixpath.splitext(url.path)
                 if (
@@ -412,6 +414,8 @@ def discover(source, inspection):
                         psnr=psnr,
                     )
                 )
+                names.add(new_path.casefold())
+                pixels += image.width * image.height
                 if (
                     image.width * image.height > 8388608
                     or image.width > 2048
@@ -645,6 +649,8 @@ def image_conversion_trial(
                 media = {}
                 with zipfile.ZipFile(current) as archive:
                     package = parse_xml(archive.read(inspection.package_path))
+                    if layout == "paginated":
+                        check_package(package)
                     for item in package.xpath("opf:manifest/opf:item", namespaces=NS):
                         target = local_target(inspection.package_path, item.get("href", ""))
                         if target:
@@ -715,8 +721,9 @@ def image_conversion_trial(
                     after=phases[1],
                 )
                 path = directory / "trial.json"
-                path.write_text(result.model_dump_json(indent=2))
                 write_trial_html(result, directory)
+                result.html_sha256 = sha256_file(directory / "trial.html")
+                path.write_text(result.model_dump_json(indent=2))
                 store.save_document(
                     identifier, row["id"], "image-conversion-trial", path, sha256_file(path)
                 )
@@ -739,6 +746,8 @@ def load_image_conversion_trial(store, book_id, identifier=None):
     result = ImageConversionTrial.model_validate_json(path.read_text())
     if result.id != document["id"] or result.book_id != book_id:
         raise ValueError("Image comparison identity mismatch.")
+    if not result.html_sha256 or sha256_file(path.with_suffix(".html")) != result.html_sha256:
+        raise ValueError("Image comparison report hash mismatch; compare again.")
     for phase in ("before", "after"):
         for sample in getattr(result, phase):
             for shot in sample.screenshots:
@@ -959,4 +968,8 @@ def apply_image_conversion(book_id, config: Config, *, trial_id, approve):
                         artifact.unlink(missing_ok=True)
                 (directory / "failure.txt").write_text(f"{type(exc).__name__}: {exc}\n")
                 store.event(book_id, "IMAGE_CONVERSION_REJECTED", f"{exc}; evidence: {directory}")
-                raise
+                if isinstance(exc, ImageConversionRejectedError):
+                    raise
+                raise ImageConversionRejectedError(
+                    f"Image conversion failed; previous book retained. Evidence: {directory}"
+                ) from exc

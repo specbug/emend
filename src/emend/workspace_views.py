@@ -7,7 +7,7 @@ from importlib.resources import files
 from pathlib import Path
 
 from emend import ENGINE_VERSION, __version__
-from emend.inspect import sha256_file
+from emend.inspect import local_target, sha256_file
 from emend.pipeline import get_report
 from emend.research.discovery import current_source
 from emend.review_guidance import (
@@ -427,7 +427,19 @@ class BookView:
         self.applied = {
             "typography-trial": {c.trial_id for c in self.report.typography_changes},
             "text-size-trial": {c.trial_id for c in self.report.text_size_changes},
-            "image-conversion-trial": {c.trial_id for c in self.report.image_conversions},
+            "image-conversion-trial": {
+                c.trial_id
+                for c in self.report.image_conversions
+                if c.images
+                and self.report.inspection.package_path
+                and all(
+                    (new := local_target(self.report.inspection.package_path, image.new_href))
+                    and new[0] in self.report.inspection.resource_hashes
+                    and (old := local_target(self.report.inspection.package_path, image.old_href))
+                    and old[0] not in self.report.inspection.resource_hashes
+                    for image in c.images
+                )
+            },
             "repairs": {c.plan_id for c in self.report.repair_changes},
             "cover-review": {
                 c.review_id for c in [*self.report.cover_changes, *self.report.cover_additions]
@@ -585,7 +597,7 @@ class BookView:
             )
             if entry[0] is not None and entry[1] and entry[0].status == "complete"
         ]
-        if report.image_conversions:
+        if self.applied["image-conversion-trial"]:
             states["refine"] = ("done", "Images converted")
         elif report.typography_changes or report.text_size_changes:
             states["refine"] = (
@@ -1337,7 +1349,11 @@ class BookView:
         changes = [
             *self.report.text_size_changes,
             *self.report.typography_changes,
-            *self.report.image_conversions,
+            *[
+                c
+                for c in self.report.image_conversions
+                if c.trial_id in self.applied["image-conversion-trial"]
+            ],
         ]
         # The baseline is where the chain of adjustments starts: no adjustment produced it.
         afters = {c.after_sha256 for c in changes}
@@ -1507,6 +1523,12 @@ class BookView:
                 + "".join(f"<li>{esc(n)}</li>" for n in trial.plan.notes)
                 + "</ul>"
             )
+            body += self.form(
+                "image-conversion-trial",
+                "Compare image conversion again",
+                cls="btn",
+                working="Converting and rendering…",
+            )
             if not applied:
                 body += self.form(
                     "apply-image-conversion",
@@ -1533,7 +1555,7 @@ class BookView:
                 )
         return (
             body
-            + '<p class="quiet small">Keeps dimensions, colour profiles, reading text and publisher styles. PNG pixels stay exact; baseline JPEG uses quality 98 with no chroma subsampling and at least 40 dB PSNR. No resizing or grayscale conversion. Nothing is applied during import. Device checks remain pending.</p></div>'
+            + '<p class="quiet small">Keeps dimensions, colour profiles, text and publisher styles. PNG preserves pixels exactly; JPEG uses high-quality colour encoding. Nothing is applied during import. Device checks remain pending.</p></div>'
         )
 
     def spacing_form(self):

@@ -679,6 +679,10 @@ and independently verifies the changes, requires EPUBCheck plus your configured
 accessibility gates, then activates or rolls back while retaining rejection evidence.
 Conversion records survive later metadata, cover, spacing, text-size, revalidation
 and recovery actions. Re-ingesting an original intentionally resets its curation.
+Recovery keeps conversion audit records while the UI checks current resource
+paths to distinguish historical conversions from the version actually restored.
+A readable source may fail format validation; only a fully checked candidate can
+be approved. Finish interrupted recovery/revalidation before converting images.
 
 Dimensions, ICC profiles, text, chapter order, IDs and publisher styles stay intact.
 Lossless/alpha/palette/line-art images become non-interlaced PNG with exact decoded

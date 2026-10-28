@@ -275,7 +275,9 @@ def test_trial_apply_and_history_after_text_size(tmp_path, config, capture, monk
     assert sha256_file(p) == before.book_id
 
 
-@pytest.mark.parametrize("failure", ["validator", "database", "candidate", "screenshot", "policy"])
+@pytest.mark.parametrize(
+    "failure", ["validator", "database", "candidate", "screenshot", "html", "policy"]
+)
 def test_apply_failure_leaves_current_artifact_unchanged(
     tmp_path, config, capture, monkeypatch, failure
 ):
@@ -295,11 +297,16 @@ def test_apply_failure_leaves_current_artifact_unchanged(
         monkeypatch.setattr(
             "emend.image_conversion.rewrite", lambda s, t, *a: t.write_bytes(b"broken")
         )
-    elif failure == "screenshot":
+    elif failure in {"screenshot", "html"}:
         path = Path(
             Store(config.root).document(before.book_id, "image-conversion-trial", trial.id)["path"]
         )
-        (path.parent / "before" / trial.before[0].screenshots[0].file).write_bytes(b"tampered")
+        target = (
+            path.with_suffix(".html")
+            if failure == "html"
+            else path.parent / "before" / trial.before[0].screenshots[0].file
+        )
+        target.write_bytes(b"tampered")
     else:
         config.quality.require_accessibility_audit = True
     with pytest.raises((ValueError, OSError, zipfile.BadZipFile)):
@@ -351,6 +358,26 @@ def test_workspace_post_is_explicit_hash_verified_and_no_get_mutation(
         workspace, f"/books/{before.book_id}?step=preview", headers={"Cookie": cookie}
     )[2]
     assert "1 WebP" not in preview and "On your X4 Pro" not in preview
+    row = Store(config.root).resolve(before.book_id)
+    assert (
+        post(
+            workspace,
+            cookie,
+            fields(
+                workspace,
+                after,
+                "restore-baseline",
+                revision=before.artifact_sha256,
+                expected_report=row["report_path"],
+            ),
+        )[0]
+        == 303
+    )
+    restored = get_report(Store(config.root), before.book_id)
+    assert restored.image_conversions == after.image_conversions
+    assert restored.artifact_sha256 == before.artifact_sha256
+    body = request(workspace, page, headers={"Cookie": cookie})[2]
+    assert "Apply image conversion" in body and "Images converted" not in body
 
 
 def test_cli_plan_apply(tmp_path, config, capture):
@@ -587,3 +614,16 @@ def test_cover_id_can_equal_its_filename_without_being_rewritten(tmp_path, confi
         assert package.xpath("opf:metadata/opf:meta[@name='cover']/@content", namespaces=NS) == [
             "cover.webp"
         ]
+
+
+def test_rtl_comparison_uses_scrolling_without_changing_reading_order(tmp_path, config, capture):
+    files = files_with()
+    files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
+        b"<spine>", b'<spine page-progression-direction="rtl">'
+    )
+    before = ingest(write_epub(tmp_path / "rtl.epub", files), config)
+    with pytest.raises(ValueError, match="layout scroll"):
+        image_conversion_trial(before.book_id, config)
+    trial = image_conversion_trial(before.book_id, config, layout="scroll")
+    after = apply_image_conversion(before.book_id, config, trial_id=trial.id, approve=True)
+    assert after.inspection.spine == before.inspection.spine

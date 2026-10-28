@@ -206,15 +206,24 @@ def cover_observation(epub, inspection):
             other = other_format_cover(root)
             if other:
                 media, href = other
+                notices = [
+                    "For an eligible raster, compare image conversion under Refine → Images and covers. SVG vectors and skipped rasters stay unchanged."
+                ]
+                if Path(href).suffix.lower() not in {
+                    ".jpg",
+                    ".jpeg",
+                    ".png",
+                    ".gif",
+                } or media not in {"image/jpeg", "image/png", "image/gif"}:
+                    notices.insert(
+                        0,
+                        "CrossPoint decodes only JPEG, PNG and GIF covers, so the X4 Pro will show no cover on its home screen or sleep screen. Device confirmation is pending.",
+                    )
                 return {
                     "title": "Cover needs review",
                     "detail": f"{media} · {href}",
                     "can_add": False,
-                    "warnings": [
-                        "CrossPoint decodes only JPEG, PNG and GIF covers, so the X4 Pro will "
-                        "show no cover on its home screen or sleep screen. Apple Books shows it.",
-                        "For an eligible raster, compare image conversion under Refine → Images and covers. SVG vectors and skipped rasters stay unchanged.",
-                    ],
+                    "warnings": notices,
                 }
             declared = declared_cover(epub, inspection.package_path)
             if declared is None:
