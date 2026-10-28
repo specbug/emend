@@ -296,6 +296,7 @@ def test_workspace_detects_compares_applies_and_restores(
     assert adjusted.text_size_changes and adjusted.state == "VALIDATED"
     body = request(workspace, page, headers={"Cookie": cookie})[2]
     assert "Applied to the book" in body and "Return to the baseline" in body
+    assert "Text size reset" in body
     assert (
         "Body text now follows the size you choose" in body and "As published, it was 76%" in body
     )

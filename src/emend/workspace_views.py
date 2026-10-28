@@ -563,7 +563,14 @@ class BookView:
             if entry[0] is not None and entry[1] and entry[0].status == "complete"
         ]
         if report.typography_changes or report.text_size_changes:
-            states["refine"] = ("done", "Adjusted")
+            states["refine"] = (
+                "done",
+                "Text size and spacing adjusted"
+                if report.typography_changes and report.text_size_changes
+                else "Spacing adjusted"
+                if report.typography_changes
+                else "Text size reset",
+            )
         elif pending:
             states["refine"] = ("attention", "Comparison to review")
         else:
