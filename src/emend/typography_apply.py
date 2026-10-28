@@ -1,6 +1,5 @@
 """Apply the exact CSS from a reviewed current trial with independent preservation."""
 
-import copy
 import posixpath
 import tempfile
 import uuid
@@ -12,6 +11,7 @@ from urllib.parse import quote
 from lxml import etree
 
 from emend import ENGINE_VERSION
+from emend.archive import copy_entry
 from emend.config import Config
 from emend.inspect import NS, inspect_epub, parse_xml, sha256_file
 from emend.models import Gate, TypographyChange
@@ -84,7 +84,7 @@ def rewrite(source, candidate, baseline, documents, css, css_hash):
         with zipfile.ZipFile(candidate, "w") as new:
             new.comment = old.comment
             for info in old.infolist():
-                new.writestr(copy.copy(info), edits.get(info.filename, old.read(info)))
+                copy_entry(new, info, edits.get(info.filename, old.read(info)))
             if resource not in old.namelist():
                 new.writestr(resource, css.encode(), compress_type=zipfile.ZIP_DEFLATED)
     return resource

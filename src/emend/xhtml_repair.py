@@ -1,6 +1,5 @@
 """Reviewed repairs for empty root languages and block-only paragraph wrappers."""
 
-import copy
 import re
 import zipfile
 from datetime import UTC, datetime
@@ -8,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from emend.archive import copy_entry
 from emend.inspect import NS, local_target, parse_xml
 from emend.navigation_repair import same_xml, serialize
 
@@ -159,8 +159,9 @@ def rewrite_markup(source, target, inspection, edits):
             trees[inspection.package_path] = package
         new.comment = old.comment
         for info in old.infolist():
-            new.writestr(
-                copy.copy(info),
+            copy_entry(
+                new,
+                info,
                 serialize(trees[info.filename]) if info.filename in trees else old.read(info),
             )
 

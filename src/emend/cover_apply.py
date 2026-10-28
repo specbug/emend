@@ -7,6 +7,7 @@ import zipfile
 from pathlib import Path
 
 from emend import ENGINE_VERSION
+from emend.archive import copy_entry
 from emend.config import Config
 from emend.covers import (
     aspect_changed,
@@ -31,7 +32,7 @@ def replace_cover(source: Path, target: Path, package: str, cover_path: str, dat
     with zipfile.ZipFile(intermediate) as archive, zipfile.ZipFile(target, "w") as output:
         output.comment = archive.comment
         for info in archive.infolist():
-            output.writestr(info, data if info.filename == cover_path else archive.read(info))
+            copy_entry(output, info, data if info.filename == cover_path else archive.read(info))
     intermediate.unlink()
     return opf_hash
 

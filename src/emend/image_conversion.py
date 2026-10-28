@@ -1,6 +1,5 @@
 """Explicit raster-format conversion with independently checked references/pixels."""
 
-import copy
 import hashlib
 import html
 import io
@@ -18,6 +17,7 @@ from PIL import Image, ImageChops, ImageStat
 from pydantic import BaseModel, ConfigDict, Field
 
 from emend import ENGINE_VERSION
+from emend.archive import copy_entry
 from emend.config import Config
 from emend.image_references import css_preserved, css_rewrite, srcset_urls
 from emend.inspect import NS, inspect_epub, local_target, parse_xml, sha256_file
@@ -500,9 +500,12 @@ def rewrite(source, candidate, inspection, plan):
         replacements.update({name: serialize(tree) for name, tree in trees.items()})
         new.comment = old.comment
         for info in old.infolist():
-            copied = copy.copy(info)
-            copied.filename = renamed.get(info.filename, info.filename)
-            new.writestr(copied, replacements.get(info.filename, old.read(info)))
+            copy_entry(
+                new,
+                info,
+                replacements.get(info.filename, old.read(info)),
+                renamed.get(info.filename, info.filename),
+            )
 
 
 def preserved(source, candidate, inspection, plan):

@@ -1,6 +1,5 @@
 """Reviewed correction of unambiguous case-only navigation resource paths."""
 
-import copy
 import posixpath
 import zipfile
 from datetime import UTC, datetime
@@ -9,6 +8,7 @@ from urllib.parse import quote, urlsplit
 from lxml import etree
 from pydantic import BaseModel, ConfigDict, Field
 
+from emend.archive import copy_entry
 from emend.inspect import NS, local_target, parse_xml
 
 ACTION = "navigation.case_paths"
@@ -157,8 +157,9 @@ def rewrite_navigation(source, target, inspection, links):
             edits[inspection.package_path] = package
         new.comment = old.comment
         for info in old.infolist():
-            new.writestr(
-                copy.copy(info),
+            copy_entry(
+                new,
+                info,
                 serialize(edits[info.filename]) if info.filename in edits else old.read(info),
             )
 
