@@ -645,3 +645,18 @@ def test_import_while_busy_keeps_the_shelf_and_explains(workspace, tmp_path, con
     assert status == 409 and "Bring a book in." in body and 'role="alert"' in body
     assert "Another review action is running" in body
     assert not Store(config.root).books()
+
+
+def test_partial_font_and_note_inventory_is_reported_not_stopped(
+    workspace, tmp_path, config, fake_pages, monkeypatch
+):
+    monkeypatch.setattr("emend.reading_review.MAX_DOCUMENTS", 1)
+    before = ingest(write_epub(tmp_path / "book.epub"), config)
+    cookie = login(workspace)
+    assert post(workspace, cookie, fields(workspace, before, "revalidate"))[0] == 303
+    step = workspace.app.runner.get(before.book_id).step("notes")
+    assert step.state == "done" and "exceeded the review limits" in step.note
+    body = request(workspace, f"/books/{before.book_id}?step=preview", headers={"Cookie": cookie})[
+        2
+    ]
+    assert "The last run stopped here" not in body

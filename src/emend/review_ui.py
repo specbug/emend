@@ -247,6 +247,29 @@ class ReviewApplication:
                 lambda r: runs.apply_spacing(r, config, book, trial, all_spine),
             )
             return location, True
+        if action == "text-size-trial":
+            layout = value(form, "layout", "paginated")
+            if layout not in {"scroll", "paginated"}:
+                raise ValueError("Layout must be scroll or paginated.")
+            self.start(
+                book,
+                "trial",
+                [("trial", "Render the book as published and at your reader's size")],
+                lambda r: runs.size_trial(r, config, book, layout),
+            )
+            return location, True
+        if action == "apply-text-size":
+            trial = value(form, "trial")
+            self.start(
+                book,
+                "apply",
+                [
+                    ("apply", "Reset body-text size and check the book"),
+                    ("preview", "Render reader pages"),
+                ],
+                lambda r: runs.apply_size(r, config, book, trial),
+            )
+            return location, True
         if action == "restore-baseline":
             revision, expected = value(form, "revision"), value(form, "expected_report")
             self.start(
@@ -560,7 +583,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 return
             if len(parts) == 7 and parts[0] == "books" and parts[2] == "pages":
                 _, book, _, kind, identifier, phase, name = parts
-                if kind not in {"visual-review", "typography-trial"}:
+                if kind not in {"visual-review", "typography-trial", "text-size-trial"}:
                     raise ValueError("Unsupported page image.")
                 book = self.server.app.store.resolve(book)["id"]
                 data = views.evidence_page_image(

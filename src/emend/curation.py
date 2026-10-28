@@ -264,6 +264,7 @@ def apply_proposals(
                     cover_changes=previous.cover_changes,
                     repair_changes=previous.repair_changes,
                     typography_changes=previous.typography_changes,
+                    text_size_changes=previous.text_size_changes,
                     cover_additions=previous.cover_additions,
                     recovery_changes=previous.recovery_changes,
                     metadata_changes=previous.metadata_changes

@@ -847,6 +847,70 @@ def typography_trials_command(
         fail(exc)
 
 
+@app.command("text-size-trial")
+def text_size_trial_command(
+    book_id: str,
+    profile: Annotated[
+        list[str] | None, typer.Option(help="compact or wide; repeat for both.")
+    ] = None,
+    max_documents: Annotated[int, typer.Option(min=1, max=9)] = 3,
+    layout: Annotated[str, typer.Option(help="scroll or paginated.")] = "paginated",
+    page_margin: Annotated[int, typer.Option(min=16, max=120)] = 40,
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Compare body text as published and reset to the reader's size; leave the EPUB unchanged."""
+    from emend.text_size import text_size_trial
+
+    try:
+        settings = load_config(config)
+        trial = text_size_trial(
+            book_id,
+            settings,
+            profiles=profile,
+            max_documents=max_documents,
+            layout=layout,
+            page_margin=page_margin,
+        )
+        path = Store(settings.root).document(trial.book_id, "text-size-trial", trial.id)["path"]
+        changes = "\n".join(
+            f"  {e.stylesheet}: {e.selector} {{ font-size: {e.before} }} -> {e.after}"
+            for e in trial.edits
+        )
+        typer.echo(
+            trial.model_dump_json(indent=2)
+            if as_json
+            else f"Text-size comparison {trial.id}: {trial.status}\n{changes}\nOpen: {Path(path).with_suffix('.html')}\nEPUB and quality state unchanged."
+        )
+        if trial.status == "incomplete":
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("apply-text-size")
+def apply_text_size_command(
+    book_id: str,
+    trial: Annotated[str, typer.Option("--trial")],
+    approve: Annotated[
+        bool, typer.Option(help="Confirm you reviewed the complete comparison and its changes.")
+    ] = False,
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Reset the compared body-text font-size values; preserve everything else and validate."""
+    from emend.text_size import TextSizeRejectedError, apply_text_size
+
+    try:
+        result = apply_text_size(book_id, load_config(config), trial_id=trial, approve=approve)
+        typer.echo(result.model_dump_json(indent=2) if as_json else report_text(result))
+    except TextSizeRejectedError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 @app.command("reading-review")
 def reading_review_command(
     book_id: str,

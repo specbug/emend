@@ -82,6 +82,8 @@ The import starts at once and runs by itself; the page follows its progress:
 3. **Preview:** reader-sized paginated pages (scrolling for books paginated preview
    cannot handle) are rendered from the current file, followed by the font and
    footnote inventory.
+   **On your X4 Pro** lists covers and images in formats CrossPoint cannot decode
+   (it shows only JPEG, PNG and GIF).
 
 Each book page shows six steps: **Import, Check, Repair, Preview, Refine, Send**.
 It opens on the step that needs you; a checked book opens on its pages, with
@@ -98,7 +100,9 @@ spacing**, which applies to every chapter unless you untick it and re-renders th
 pages. After applying, the comparison stays as baseline versus adjustment, and
 **Return to the baseline** restores the previous checked version through recovery.
 Edition lookups, suggested details and covers sit in the same step and still need an
-explicit save. Font-family and text-size changes are not supported.
+explicit save. **Text size on your reader** resets publisher body-text sizes that shrink
+or enlarge the size chosen on the device; see below. Typeface is a reader setting on
+CrossPoint, which ignores fonts embedded in a book.
 
 **Send** downloads the checked EPUB for CrossPoint's file-transfer page, or uses
 configured Calibre/Drive/reader-folder destinations. Sending stays disabled while
@@ -407,6 +411,33 @@ The default edits only the documents sampled in the named trial. `--all-spine` e
 Application adds the exact trial CSS as a manifest resource, appends stylesheet links to approved XHTML heads, and updates the EPUB 3 modification timestamp. It independently checks the XML trees and resource inventory: reading text, labels, fonts, images, existing CSS, metadata and spine order must remain unchanged. Existing stylesheets remain available; the new numeric rules participate in the CSS cascade exactly as in the trial. A different trial can layer further changes; `reset-original` restores original bytes and clears active edits after explicit review.
 
 Required validators run before activation. Rejected candidates preserve the previous artifact/report and retain evidence. Originals and pre/post revisions remain available; application errors roll back, including database/copy failure after replacement. Repeating the same successful trial/scope is idempotent. Typography history survives later metadata edits, cover changes, repairs and revalidation. Changed artifact hashes make earlier visual/metadata proposals stale. Publishing remains explicit. Forced-interruption/power-loss durability during activation remains a separate validation task.
+
+## Reset body text to the reader's size
+
+```sh
+uv run emend text-size-trial BOOK_ID
+uv run emend apply-text-size BOOK_ID --trial TRIAL_ID --approve
+```
+
+CrossPoint applies a book's relative `font-size` rules on top of the size chosen on
+the device. It ignores `!important` and fonts embedded in the book; see
+[CrossPoint typography](docs/crosspoint-typography.md). The trial finds `font-size`
+values in plain `html`, `body` and `p` rules of UTF-8 stylesheets that scale that size.
+It builds a candidate with only those values reset (`1em`, `1rem` or `100%`) and
+renders the current book and the candidate from one verified snapshot. Class and id
+rules, headings, inline styles, `@media` blocks, the `font` shorthand and absolute
+`px`/`pt` sizes are listed and left as published. A root-size chain such as
+`html { font-size: 62.5% }` with `rem` sizes elsewhere is left alone.
+
+Applying requires a validated book, a complete current comparison and `--approve`.
+It replays the same edits and independently checks that every byte outside the
+planned values matches, both as bytes and as parsed rules. Other files must be
+identical apart from the EPUB 3 modification timestamp, and the reading text, spine
+and metadata are unchanged. Required validators run before activation; a rejected
+candidate leaves the previous book in place. `text_size_changes` survive later
+edits, and the workspace's **Return to the baseline** restores the earlier version
+through recovery. Comparisons live under `~/Emend/text-size/BOOK_ID/TRIAL_ID/`.
+Browser screenshots are not a device preview: check the result on the reader.
 
 ## Review fonts, notes and reading direction
 

@@ -18,7 +18,7 @@ from emend.research.discovery import current_source
 from emend.revalidation import snapshot
 from emend.storage import Store, now
 
-MAX_DOCUMENTS = 1000
+MAX_DOCUMENTS = 5000
 MAX_REFERENCES = 5000
 MAX_FONTS = 200
 FONT_TYPES = {

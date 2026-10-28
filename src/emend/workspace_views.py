@@ -18,6 +18,7 @@ from emend.review_guidance import (
     blockers,
     cover_observation,
     epubcheck_messages,
+    reader_notes,
 )
 
 STATIONS = [
@@ -170,20 +171,37 @@ def facts(rows):
     return f'<dl class="facts">{items}</dl>'
 
 
+SPINE_BINS = 240
+
+
 def spine_svg(spine, seen=(), flagged=(), name="Reading order"):
-    """One tick per spine document, in reading order: previewed and problem files marked."""
-    count = max(len(spine), 1)
+    """One tick per spine document, in reading order: previewed and problem files marked.
+
+    Long books are grouped into at most SPINE_BINS ticks; a tick is marked when any
+    document it covers is previewed or has problems.
+    """
+    total = len(spine[:5000])
+    size = max(1, -(-total // SPINE_BINS))
+    groups = [spine[i : i + size] for i in range(0, total, size)]
+    count = max(len(groups), 1)
     pitch = 14 if count <= 40 else 9 if count <= 120 else 6
     width = 3
     rects = []
-    for index, document in enumerate(spine[:2000]):
-        cls = "flag" if document in flagged else "seen" if document in seen else ""
-        title = f"<title>{esc(document)}</title>" if len(spine) <= 400 else ""
+    for index, group in enumerate(groups):
+        cls = (
+            "flag"
+            if any(d in flagged for d in group)
+            else "seen"
+            if any(d in seen for d in group)
+            else ""
+        )
+        label = group[0] if len(group) == 1 else f"{group[0]} – {group[-1]}"
+        title = f"<title>{esc(label)}</title>"
         rects.append(
             f'<rect x="{index * pitch}" y="0" width="{width}" height="10"'
             f"{f' class={chr(34)}{cls}{chr(34)}' if cls else ''}>{title}</rect>"
         )
-    extent = (min(count, 2000) - 1) * pitch + width
+    extent = (count - 1) * pitch + width
     return (
         f'<svg class="spine" width="{extent}" height="10" viewBox="0 0 {extent} 10" '
         f'preserveAspectRatio="none" role="img" '
@@ -408,6 +426,7 @@ class BookView:
         self.reviews = current_reviews(self.store, self.config, row, digest)
         self.applied = {
             "typography-trial": {c.trial_id for c in self.report.typography_changes},
+            "text-size-trial": {c.trial_id for c in self.report.text_size_changes},
             "repairs": {c.plan_id for c in self.report.repair_changes},
             "cover-review": {
                 c.review_id for c in [*self.report.cover_changes, *self.report.cover_additions]
@@ -556,10 +575,21 @@ class BookView:
             states["preview"] = ("attention", "Could not render")
         else:
             states["preview"] = ("waiting", "Not rendered")
-        trial = self.latest("typography-trial")
-        if report.typography_changes:
-            states["refine"] = ("done", "Spacing adjusted")
-        elif trial[0] is not None and trial[1] and trial[0].status == "complete":
+        pending = [
+            entry
+            for entry in (self.latest("typography-trial"), self.latest("text-size-trial"))
+            if entry[0] is not None and entry[1] and entry[0].status == "complete"
+        ]
+        if report.typography_changes or report.text_size_changes:
+            states["refine"] = (
+                "done",
+                "Text size and spacing adjusted"
+                if report.typography_changes and report.text_size_changes
+                else "Spacing adjusted"
+                if report.typography_changes
+                else "Text size reset",
+            )
+        elif pending:
             states["refine"] = ("attention", "Comparison to review")
         else:
             states["refine"] = ("optional", "Optional")
@@ -1239,6 +1269,15 @@ class BookView:
                 )
                 + f'<div class="actions">{render}</div></div><div></div></div>'
             )
+        notes = reader_notes(self.source, self.report.inspection)
+        if notes:
+            body += (
+                '<div class="block">'
+                + label("On your X4 Pro")
+                + '<ul class="observations">'
+                + "".join(f"<li>{esc(n)}</li>" for n in notes)
+                + "</ul><p class='quiet small'>From the CrossPoint 2.0.0-rc source; confirm on the device.</p></div>"
+            )
         body += self.cover_fold() + self.reading_fold()
         return body
 
@@ -1288,32 +1327,146 @@ class BookView:
         )
 
     def panel_refine(self):
+        changes = [*self.report.text_size_changes, *self.report.typography_changes]
+        # The baseline is where the chain of adjustments starts: no adjustment produced it.
+        afters = {c.after_sha256 for c in changes}
+        first = next((c for c in changes if c.before_sha256 not in afters), None)
         body = (
-            '<div class="split"><div><p>Optional. The checked book is your baseline. Choose a spacing, '
-            "compare it with the baseline page by page, and apply it only if it reads better. "
-            "Publisher fonts, alignment and indentation stay as they are.</p></div><div>"
+            '<div class="split"><div><p>Optional. The checked book is your baseline. Adjust text '
+            "size or spacing, compare page by page, and apply only what reads better. Publisher "
+            "fonts, alignment and indentation stay as they are.</p></div><div>"
             + facts(
                 [
                     (
                         "Baseline",
-                        f'<code title="{esc(self.report.typography_changes[0].before_sha256)}">'
-                        f"{short(self.report.typography_changes[0].before_sha256)}</code>"
-                        if self.report.typography_changes
+                        f'<code title="{esc(first.before_sha256)}">{short(first.before_sha256)}</code>'
+                        if first
                         else "This version",
                     ),
                     (
                         "Adjusted",
                         f"Applied {esc(nice_time(self.report.created_at))}"
-                        if self.report.typography_changes
+                        if changes
                         else "Not yet",
                     ),
                 ]
             )
             + "</div></div>"
         )
-        body += '<div class="block">' + label("Spacing") + self.spacing_form() + "</div>"
+        body += self.text_size_block()
+        body += (
+            '<div class="block">'
+            + label("Spacing")
+            + '<p class="quiet small">On CrossPoint, line height comes from the reader’s own Line '
+            "Spacing setting and the book’s line height is ignored. The space after paragraphs is "
+            "used while Embedded Style is on.</p>" + self.spacing_form() + "</div>"
+        )
         body += self.comparison()
         body += '<div class="block">' + self.details_fold() + "</div>"
+        return body
+
+    def size_summary(self, edits, applied=False):
+        from emend.text_size import effective_scale
+
+        scale = effective_scale(edits)
+        if applied:
+            headline = "Body text now follows the size you choose on your reader." + (
+                f" As published, it was {round(scale * 100)}% of that size." if scale else ""
+            )
+        elif scale:
+            headline = f"This book sets body text to {round(scale * 100)}% of the size you choose on your reader."
+        else:
+            headline = (
+                "This book changes body-text size relative to the size you choose on your reader."
+            )
+        rules = "".join(
+            f"<li><code>{esc(e.selector)} {{ font-size: {esc(e.before)} }}</code>"
+            f"<p>{esc(e.stylesheet)} · becomes <code>{esc(e.after)}</code></p></li>"
+            for e in edits[:20]
+        )
+        return (
+            f"<h3>{esc(headline)}</h3><p>CrossPoint applies these rules on top of its own text "
+            "size, so the book reads smaller or larger than your other books. Resetting them "
+            "changes only these values; the publisher’s other styles stay as they are.</p>"
+            f'<ul class="observations">{rules}</ul>'
+        )
+
+    def text_size_block(self):
+        body = '<div class="block">' + label("Text size on your reader")
+        trial, current, problem = self.latest("text-size-trial")
+        applied = trial is not None and trial.id in self.applied["text-size-trial"]
+        if problem:
+            body += f'<div class="alert">{label("The saved comparison could not be opened")}<p>{esc(problem)}</p></div>'
+        if trial is not None and (current or applied):
+            body += self.size_summary(trial.edits, applied)
+            body += self.compare_viewer(
+                "text-size-trial",
+                trial,
+                "ts",
+                applied,
+                [plural(len(trial.edits), "size rule")],
+                names=("As published", "Reader’s size"),
+            )
+            if trial.status != "complete":
+                body += "<p>Some pages could not be rendered, so this comparison cannot be applied. Compare again.</p>"
+            elif not applied:
+                body += (
+                    '<div class="actions">'
+                    + self.form(
+                        "apply-text-size",
+                        "Use my reader’s size",
+                        hidden={"trial": trial.id},
+                        disabled=not self.ready,
+                        cls="btn primary",
+                        working="Applying…",
+                    )
+                    + (
+                        ""
+                        if self.ready
+                        else '<p class="note quiet small">Text size can be reset once the required checks pass.</p>'
+                    )
+                    + "</div>"
+                )
+            else:
+                change = next(c for c in self.report.text_size_changes if c.trial_id == trial.id)
+                body += self.baseline_restore(change, "this text-size reset")
+            if trial.notes:
+                body += (
+                    '<ul class="observations">'
+                    + "".join(f"<li>{esc(n)}</li>" for n in trial.notes)
+                    + "</ul>"
+                )
+            body += (
+                f'<p class="quiet small"><a href="{self.evidence_url("text-size-trial", trial.id)}" '
+                'target="_blank" rel="noopener noreferrer">Open the full comparison report</a>.</p>'
+            )
+        else:
+            edits, notes = text_size_findings(self.source, self.digest, self.report.inspection)
+            if edits:
+                body += self.size_summary(edits) + (
+                    '<div class="actions">'
+                    + self.form(
+                        "text-size-trial",
+                        "Compare at my reader’s size",
+                        cls="btn primary",
+                        working="Rendering both…",
+                    )
+                    + '<p class="note quiet small">Renders the book as published and with these '
+                    "values reset. Nothing changes until you apply it.</p></div>"
+                )
+            else:
+                body += "<p>Body text follows the size you choose on your reader.</p>"
+            if notes:
+                body += (
+                    '<ul class="observations">'
+                    + "".join(f"<li>{esc(n)}</li>" for n in notes)
+                    + "</ul>"
+                )
+        body += (
+            '<p class="quiet small">The typeface is a reader setting: CrossPoint draws with its own '
+            "font (Settings → Reader → Font Family, or fonts installed on the SD card) and ignores "
+            "fonts embedded in a book. Choose the base size under Reader Font Size.</p></div>"
+        )
         return body
 
     def spacing_form(self):
@@ -1373,76 +1526,10 @@ class BookView:
             values.append(f"Line height {trial.settings.line_height:g}")
         if trial.settings.paragraph_gap is not None:
             values.append(f"Paragraph gap {trial.settings.paragraph_gap:g} em")
-        pairs = []
-        for document in trial.selected_documents:
-            for profile in trial.profiles:
-                before = next(
-                    (s for s in trial.before if s.document == document and s.profile == profile),
-                    None,
-                )
-                after = next(
-                    (s for s in trial.after if s.document == document and s.profile == profile),
-                    None,
-                )
-                shots_before = before.screenshots if before else []
-                shots_after = after.screenshots if after else []
-                for index in range(max(len(shots_before), len(shots_after))):
-                    cells = []
-                    for phase, sample, shots, cls, name in (
-                        ("before", before, shots_before, "is-base", "Baseline"),
-                        ("after", after, shots_after, "is-next", "Adjusted"),
-                    ):
-                        if index >= len(shots):
-                            cells.append(
-                                f'<figure class="{cls}"><p class="quiet small">No page here.</p></figure>'
-                            )
-                            continue
-                        shot = shots[index]
-                        position = (
-                            f"p. {shot.page_number} of {sample.page_count}"
-                            if shot.page_number is not None
-                            else f"{shot.scroll_y:,} px down"
-                        )
-                        url = self.image_url("typography-trial", trial.id, phase, shot.file)
-                        cells.append(
-                            f'<figure class="{cls}"><a class="page-link" href="{url}" target="_blank" rel="noopener noreferrer">'
-                            f'<img src="{url}" width="{sample.width}" height="{sample.height}" loading="lazy" '
-                            f'alt="{name}: {esc(document)}, {esc(position)}"></a><figcaption class="label">'
-                            f'<span class="{"is-next-label" if phase == "after" else ""}">{name}</span><span>{esc(position)}</span></figcaption></figure>'
-                        )
-                    pairs.append(
-                        (
-                            index,
-                            f'<div class="pair"><p class="label pair-title">{esc(document.rsplit("/", 1)[-1])}</p>{"".join(cells)}</div>',
-                        )
-                    )
-        # First pages of every document come first; later pages wait in a fold.
-        ordered = [markup for _, markup in sorted(pairs, key=lambda item: item[0])]
-        shown, hidden = ordered[:3], ordered[3:]
-        rest = (
-            f'<details class="fold more-pairs"><summary>{plural(len(hidden), "more page pair")}</summary>'
-            f'<div class="pairs-rest">{"".join(hidden)}</div></details>'
-            if hidden
-            else ""
-        )
-        status = (
-            tag("done", "Applied to the book")
-            if applied
-            else tag("attention", "Not applied yet")
-            if trial.status == "complete"
-            else tag("failed", "Incomplete")
-        )
         body = (
             '<div class="block">'
             + label("Baseline and adjusted" if not applied else "Baseline and your adjustment")
-            + f'<div class="values">{status}'
-            + "".join(f'<span class="label">{esc(v)}</span>' for v in values)
-            + "</div>"
-            + '<div class="compare"><input type="radio" name="cmp" id="cmp-side" checked>'
-            '<input type="radio" name="cmp" id="cmp-base"><input type="radio" name="cmp" id="cmp-next">'
-            '<div class="seg" role="group" aria-label="Show"><label for="cmp-side">Side by side</label>'
-            '<label for="cmp-base">Baseline</label><label for="cmp-next">Adjusted</label></div>'
-            f'<div class="pairs">{"".join(shown)}{rest}</div></div>'
+            + self.compare_viewer("typography-trial", trial, "sp", applied, values)
         )
         if trial.status != "complete":
             body += "<p>Some pages could not be rendered, so this comparison cannot be applied. Compare again.</p>"
@@ -1476,10 +1563,85 @@ class BookView:
         )
         return body
 
-    def baseline_restore(self):
+    def compare_viewer(self, kind, trial, prefix, applied, values, names=("Baseline", "Adjusted")):
+        """Pairs of pages from one trial; CSS-only side-by-side or one-at-a-time viewing."""
+        pairs = []
+        for document in trial.selected_documents:
+            for profile in trial.profiles:
+                before = next(
+                    (s for s in trial.before if s.document == document and s.profile == profile),
+                    None,
+                )
+                after = next(
+                    (s for s in trial.after if s.document == document and s.profile == profile),
+                    None,
+                )
+                shots_before = before.screenshots if before else []
+                shots_after = after.screenshots if after else []
+                for index in range(max(len(shots_before), len(shots_after))):
+                    cells = []
+                    for phase, sample, shots, cls, name in (
+                        ("before", before, shots_before, "is-base", names[0]),
+                        ("after", after, shots_after, "is-next", names[1]),
+                    ):
+                        if index >= len(shots):
+                            cells.append(
+                                f'<figure class="{cls}"><p class="quiet small">No page here.</p></figure>'
+                            )
+                            continue
+                        shot = shots[index]
+                        position = (
+                            f"p. {shot.page_number} of {sample.page_count}"
+                            if shot.page_number is not None
+                            else f"{shot.scroll_y:,} px down"
+                        )
+                        url = self.image_url(kind, trial.id, phase, shot.file)
+                        cells.append(
+                            f'<figure class="{cls}"><a class="page-link" href="{url}" target="_blank" rel="noopener noreferrer">'
+                            f'<img src="{url}" width="{sample.width}" height="{sample.height}" loading="lazy" '
+                            f'alt="{esc(name)}: {esc(document)}, {esc(position)}"></a><figcaption class="label">'
+                            f'<span class="{"is-next-label" if phase == "after" else ""}">{esc(name)}</span><span>{esc(position)}</span></figcaption></figure>'
+                        )
+                    pairs.append(
+                        (
+                            index,
+                            f'<div class="pair"><p class="label pair-title">{esc(document.rsplit("/", 1)[-1])}</p>{"".join(cells)}</div>',
+                        )
+                    )
+        # First pages of every document come first; later pages wait in a fold.
+        ordered = [markup for _, markup in sorted(pairs, key=lambda item: item[0])]
+        shown, hidden = ordered[:3], ordered[3:]
+        rest = (
+            f'<details class="fold more-pairs"><summary>{plural(len(hidden), "more page pair")}</summary>'
+            f'<div class="pairs-rest">{"".join(hidden)}</div></details>'
+            if hidden
+            else ""
+        )
+        status = (
+            tag("done", "Applied to the book")
+            if applied
+            else tag("attention", "Not applied yet")
+            if trial.status == "complete"
+            else tag("failed", "Incomplete")
+        )
+        group = f"{prefix}-cmp"
+        return (
+            f'<div class="values">{status}'
+            + "".join(f'<span class="label">{esc(v)}</span>' for v in values)
+            + "</div>"
+            + f'<div class="compare"><input type="radio" name="{group}" id="{group}-side" class="cmp-side" checked>'
+            f'<input type="radio" name="{group}" id="{group}-base" class="cmp-base">'
+            f'<input type="radio" name="{group}" id="{group}-next" class="cmp-next">'
+            f'<div class="seg" role="group" aria-label="Show"><label for="{group}-side" class="for-side">Side by side</label>'
+            f'<label for="{group}-base" class="for-base">{esc(names[0])}</label>'
+            f'<label for="{group}-next" class="for-next">{esc(names[1])}</label></div>'
+            f'<div class="pairs">{"".join(shown)}{rest}</div></div>'
+        )
+
+    def baseline_restore(self, change=None, what="this spacing"):
         from emend.recovery import recovery_options
 
-        change = self.report.typography_changes[-1]
+        change = change or self.report.typography_changes[-1]
         try:
             options = {o["sha256"] for o in recovery_options(self.book, self.config)}
         except (ValueError, OSError):
@@ -1498,7 +1660,7 @@ class BookView:
                 cls="btn",
                 working="Restoring…",
             )
-            + '<p class="note quiet small">Restores the version before this spacing and checks it again. '
+            + f'<p class="note quiet small">Restores the version before {esc(what)} and checks it again. '
             "The adjusted version is kept aside.</p></div>"
         )
 
@@ -1734,16 +1896,42 @@ def recovery(app, book, reason=""):
     return page("Recovery", body, kind="book")
 
 
+_TEXT_SIZE_CACHE: dict = {}
+
+
+def text_size_findings(source, digest, inspection):
+    """Read-only CSS check of the current file, cached by its hash for page views."""
+    from emend.text_size import discover
+
+    if inspection.source_sha256 != digest:
+        return [], []
+    key = (str(source), digest)
+    if key not in _TEXT_SIZE_CACHE:
+        try:
+            result = discover(source, inspection)
+        except (ValueError, OSError, KeyError):
+            result = ([], ["The stylesheets could not be checked for text size."])
+        if len(_TEXT_SIZE_CACHE) > 64:
+            _TEXT_SIZE_CACHE.clear()
+        _TEXT_SIZE_CACHE[key] = result
+    return _TEXT_SIZE_CACHE[key]
+
+
 def evidence_page_image(store, book, kind, identifier, phase, name):
     """Serve one recorded screenshot only after its registered and recorded hashes match."""
+    from emend.text_size import TextSizeTrial
     from emend.typography import TypographyTrial
     from emend.visual import VisualReview
 
+    folders = {
+        "visual-review": "visual",
+        "typography-trial": "typography",
+        "text-size-trial": "text-size",
+    }
+    models = {"typography-trial": TypographyTrial, "text-size-trial": TextSizeTrial}
     row = store.document(book, kind, identifier)
     path = Path(row["path"])
-    expected = (
-        store.root / ("visual" if kind == "visual-review" else "typography") / book / identifier
-    )
+    expected = store.root / folders[kind] / book / identifier
     if path.parent.resolve() != expected.resolve() or path.stat().st_size > 8 * 1024**2:
         raise ValueError("Invalid review location or size.")
     if sha256_file(path) != row["sha256"]:
@@ -1752,7 +1940,7 @@ def evidence_page_image(store, book, kind, identifier, phase, name):
         review = VisualReview.model_validate_json(path.read_text())
         samples, folder = (review.samples if phase == "pages" else []), path.parent
     else:
-        review = TypographyTrial.model_validate_json(path.read_text())
+        review = models[kind].model_validate_json(path.read_text())
         samples = getattr(review, phase) if phase in {"before", "after"} else []
         folder = path.parent / phase
     if review.id != identifier or review.book_id != book:
@@ -1795,7 +1983,14 @@ def book_page(app, book, error=None, step=None, opened=""):
 
 # Saved evidence -------------------------------------------------------------
 
-EVIDENCE = {"cover-review", "repairs", "visual-review", "typography-trial", "reading-review"}
+EVIDENCE = {
+    "cover-review",
+    "repairs",
+    "visual-review",
+    "typography-trial",
+    "text-size-trial",
+    "reading-review",
+}
 
 
 def load_evidence(store, book, kind, identifier):
@@ -1815,6 +2010,10 @@ def load_evidence(store, book, kind, identifier):
         from emend.typography import load_trial
 
         return load_trial(store, book, identifier)
+    if kind == "text-size-trial":
+        from emend.text_size import load_text_size_trial
+
+        return load_text_size_trial(store, book, identifier)
     if kind == "reading-review":
         from emend.reading_review import load_reading_review
 

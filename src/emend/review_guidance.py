@@ -40,6 +40,8 @@ ACTION_STEPS = {
     "typography-trial": "refine",
     "apply-typography": "refine",
     "restore-baseline": "refine",
+    "text-size-trial": "refine",
+    "apply-text-size": "refine",
     **{
         action: "refine"
         for action in (
@@ -154,6 +156,25 @@ def epubcheck_messages(report, reports_root):
         )
 
 
+def other_format_cover(package):
+    """(media type, href) when one declared cover image is a format other than JPEG/PNG."""
+    from emend.inspect import NS
+
+    items = package.findall("opf:manifest/opf:item", NS)
+    ids = {item.get("id") for item in items if "cover-image" in item.get("properties", "").split()}
+    ids.update(
+        node.get("content")
+        for node in package.xpath("opf:metadata/opf:meta[@name='cover']", namespaces=NS)
+    )
+    matches = [item for item in items if item.get("id") in ids]
+    if len(ids) != 1 or len(matches) != 1:
+        return None
+    media = matches[0].get("media-type", "")
+    if not media.startswith("image/") or media in {"image/jpeg", "image/png"}:
+        return None
+    return media, matches[0].get("href", "")
+
+
 def cover_observation(epub, inspection):
     """Advisory embedded-cover facts, separate from required publication gates."""
     import io
@@ -180,6 +201,20 @@ def cover_observation(epub, inspection):
             if len(package) > 8 * 1024**2:
                 raise ValueError("Package metadata exceeds the cover-check limit.")
             root = parse_xml(package)
+            other = other_format_cover(root)
+            if other:
+                media, href = other
+                return {
+                    "title": "Cover needs review",
+                    "detail": f"{media} · {href}",
+                    "can_add": False,
+                    "warnings": [
+                        "CrossPoint decodes only JPEG, PNG and GIF covers, so the X4 Pro will "
+                        "show no cover on its home screen or sleep screen. Apple Books shows it.",
+                        "Emend replaces only JPEG or PNG covers; converting this one needs an "
+                        "edit outside Emend for now.",
+                    ],
+                }
             declared = declared_cover(epub, inspection.package_path)
             if declared is None:
                 hinted = bool(root.xpath("opf:guide/opf:reference[@type='cover']", namespaces=NS))
@@ -243,3 +278,55 @@ def cover_observation(epub, inspection):
             "can_add": False,
             "warnings": [],
         }
+
+
+# CrossPoint 2.0.0-rc picks an image decoder by file extension (lib/FsHelpers).
+CROSSPOINT_IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif")
+IMAGE_NAMES = {"webp": "WebP", "svg+xml": "SVG", "avif": "AVIF", "bmp": "BMP", "tiff": "TIFF"}
+
+
+def reader_notes(epub, inspection):
+    """Advisory X4 Pro observations from the manifest; reader behaviour still needs a device check."""
+    import zipfile
+
+    from emend.inspect import NS, local_target, parse_xml
+
+    if inspection.blocking or not inspection.package_path:
+        return []
+    try:
+        with zipfile.ZipFile(epub) as archive:
+            data = archive.read(inspection.package_path)
+        if len(data) > 8 * 1024**2:
+            return []
+        package = parse_xml(data)
+    except (ValueError, OSError, KeyError, zipfile.BadZipFile):
+        return []
+    unsupported, cover = {}, None
+    for item in package.xpath(
+        "opf:manifest/opf:item[starts-with(@media-type, 'image/')]", namespaces=NS
+    ):
+        target = local_target(inspection.package_path, item.get("href", ""))
+        if not target:
+            continue
+        name = target[0]
+        if not name.lower().endswith(CROSSPOINT_IMAGE_EXTENSIONS):
+            subtype = item.get("media-type", "image").split("/", 1)[-1].lower()
+            kind = IMAGE_NAMES.get(subtype, subtype.upper())
+            unsupported[kind] = unsupported.get(kind, 0) + 1
+            if "cover-image" in item.get("properties", "").split():
+                cover = kind
+    notes = []
+    if cover:
+        notes.append(
+            f"The cover is a {cover} image. CrossPoint decodes only JPEG, PNG and GIF, so the "
+            "X4 Pro will show no cover on its home screen or sleep screen."
+        )
+    if unsupported:
+        total = sum(unsupported.values())
+        kinds = ", ".join(f"{count} {kind}" for kind, count in sorted(unsupported.items()))
+        notes.append(
+            f"{total} {'image uses a format' if total == 1 else 'images use formats'} CrossPoint "
+            f"cannot decode ({kinds}). On the X4 Pro they are left out, or replaced by their alt "
+            "text; Apple Books and browsers show them. Emend does not convert images."
+        )
+    return notes

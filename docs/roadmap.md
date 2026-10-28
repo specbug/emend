@@ -29,6 +29,13 @@ Version 0.22 lets supported repairs combine: one plan chains packaging, contents
 and markup repairs, each checked independently, with only the final copy validated and
 activated. No new kinds of repair were added.
 
+Version 0.23 adds **Text size on your reader**. CrossPoint applies a book's relative
+`font-size` rules on top of the device size, ignores `!important` and embedded fonts,
+and does not read line height. Emend therefore resets only the publisher's own
+body-text `font-size` values, after a compared preview and explicit approval, with
+every other byte verified unchanged. Embedding typefaces for other readers is a
+separate follow-up.
+
 ## Implemented workflow
 
 - **Preserve and inspect.** Originals retain their exact bytes and identity hashes.
