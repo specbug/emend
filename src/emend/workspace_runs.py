@@ -308,12 +308,13 @@ def notes(run, config, book):
         run.end("notes", "failed", explain(exc))
         return
     fonts, marked = len(review.fonts), len(review.notes)
+    # Advisory evidence: a bounded, partial inventory is reported as such, not as a stop.
     run.end(
         "notes",
-        "done" if review.complete else "failed",
+        "done",
         f"{fonts} embedded {'font' if fonts == 1 else 'fonts'} and "
-        f"{marked} marked {'note' if marked == 1 else 'notes'}."
-        + ("" if review.complete else " Some files exceeded the review limits."),
+        f"{marked} marked {'note' if marked == 1 else 'notes'}"
+        + ("." if review.complete else " so far; the rest of the book exceeded the review limits."),
     )
 
 

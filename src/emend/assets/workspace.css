@@ -195,7 +195,7 @@ legend { padding: 0; margin-bottom: var(--s1); font-weight: 500; }
 /* Messages */
 
 .notice { display: flex; gap: 0.75rem; align-items: baseline; margin: 0 0 var(--s4); padding: 0.875rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
-.notice p { margin: 0; }
+.notice p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .alert { margin: 0 0 var(--s4); padding: var(--s3); border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-wash); }
 .alert h2 { font-size: 1.125rem; margin-bottom: var(--s1); }
 .alert p:last-child { margin-bottom: 0; }

@@ -395,6 +395,7 @@ def test_cover_check_reports_reader_hints_without_changing_approval(tmp_path, co
         assert "declared image type" in info["warnings"][0]
     elif problem == "svg":
         assert info["title"] == "Cover needs review"
+        assert "CrossPoint decodes only JPEG, PNG and GIF" in info["warnings"][0]
     assert get_report(Store(config.root), before.book_id) == before
 
 
@@ -496,3 +497,40 @@ def test_action_notices_belong_to_one_book_and_are_shown_once(workspace, tmp_pat
         "This change belongs"
         not in request(workspace, "/books/" + first.book_id, headers={"Cookie": cookie})[2]
     )
+
+
+def test_reader_notes_flag_images_crosspoint_cannot_decode(tmp_path, config):
+    from emend.review_guidance import cover_observation, reader_notes
+    from tests.epub_factory import book_files
+
+    files = book_files()
+    files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
+        b'id="image" href="observatory.png" media-type="image/png"',
+        b'id="image" href="observatory.webp" media-type="image/webp" properties="cover-image"',
+    )
+    files["EPUB/chapter.xhtml"] = files["EPUB/chapter.xhtml"].replace(
+        b"observatory.png", b"observatory.webp"
+    )
+    files["EPUB/observatory.webp"] = files.pop("EPUB/observatory.png")
+    before = ingest(write_epub(tmp_path / "webp.epub", files), config)
+    source = config.root / "curated" / f"{before.book_id}.epub"
+    notes = reader_notes(source, before.inspection)
+    assert any("cover is a WebP image" in n for n in notes)
+    assert any("1 image uses a format CrossPoint cannot decode (1 WebP)" in n for n in notes)
+    info = cover_observation(source, before.inspection)
+    assert info["title"] == "Cover needs review" and "image/webp" in info["detail"]
+    assert any("no cover on its home screen" in w for w in info["warnings"])
+    plain = ingest(write_epub(tmp_path / "plain.epub"), config)
+    assert reader_notes(config.root / "curated" / f"{plain.book_id}.epub", plain.inspection) == []
+    assert get_report(Store(config.root), before.book_id) == before
+
+
+def test_long_reading_orders_are_grouped_into_bins():
+    from emend.workspace_views import SPINE_BINS, spine_svg
+
+    spine = [f"EPUB/text/ch{i:04d}.xhtml" for i in range(1469)]
+    svg = spine_svg(spine, seen={spine[700]}, flagged={spine[1468]})
+    assert svg.count("<rect") <= SPINE_BINS
+    assert svg.count('class="seen"') == 1 and svg.count('class="flag"') == 1
+    assert "1,469 documents" in svg
+    assert spine_svg(spine[:12]).count("<rect") == 12

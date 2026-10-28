@@ -18,6 +18,7 @@ from emend.review_guidance import (
     blockers,
     cover_observation,
     epubcheck_messages,
+    reader_notes,
 )
 
 STATIONS = [
@@ -170,20 +171,37 @@ def facts(rows):
     return f'<dl class="facts">{items}</dl>'
 
 
+SPINE_BINS = 240
+
+
 def spine_svg(spine, seen=(), flagged=(), name="Reading order"):
-    """One tick per spine document, in reading order: previewed and problem files marked."""
-    count = max(len(spine), 1)
+    """One tick per spine document, in reading order: previewed and problem files marked.
+
+    Long books are grouped into at most SPINE_BINS ticks; a tick is marked when any
+    document it covers is previewed or has problems.
+    """
+    total = len(spine[:5000])
+    size = max(1, -(-total // SPINE_BINS))
+    groups = [spine[i : i + size] for i in range(0, total, size)]
+    count = max(len(groups), 1)
     pitch = 14 if count <= 40 else 9 if count <= 120 else 6
     width = 3
     rects = []
-    for index, document in enumerate(spine[:2000]):
-        cls = "flag" if document in flagged else "seen" if document in seen else ""
-        title = f"<title>{esc(document)}</title>" if len(spine) <= 400 else ""
+    for index, group in enumerate(groups):
+        cls = (
+            "flag"
+            if any(d in flagged for d in group)
+            else "seen"
+            if any(d in seen for d in group)
+            else ""
+        )
+        label = group[0] if len(group) == 1 else f"{group[0]} – {group[-1]}"
+        title = f"<title>{esc(label)}</title>"
         rects.append(
             f'<rect x="{index * pitch}" y="0" width="{width}" height="10"'
             f"{f' class={chr(34)}{cls}{chr(34)}' if cls else ''}>{title}</rect>"
         )
-    extent = (min(count, 2000) - 1) * pitch + width
+    extent = (count - 1) * pitch + width
     return (
         f'<svg class="spine" width="{extent}" height="10" viewBox="0 0 {extent} 10" '
         f'preserveAspectRatio="none" role="img" '
@@ -1250,6 +1268,15 @@ class BookView:
                     "middle and end of the book at a reader-sized width.</p>"
                 )
                 + f'<div class="actions">{render}</div></div><div></div></div>'
+            )
+        notes = reader_notes(self.source, self.report.inspection)
+        if notes:
+            body += (
+                '<div class="block">'
+                + label("On your X4 Pro")
+                + '<ul class="observations">'
+                + "".join(f"<li>{esc(n)}</li>" for n in notes)
+                + "</ul><p class='quiet small'>From the CrossPoint 2.0.0-rc source; confirm on the device.</p></div>"
             )
         body += self.cover_fold() + self.reading_fold()
         return body

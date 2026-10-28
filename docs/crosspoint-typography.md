@@ -26,6 +26,17 @@ subset of each book's CSS:
   publisher's CSS does not reliably beat a more specific publisher rule such as
   `p.text`.
 
+## Images and covers
+
+CrossPoint picks an image decoder by file extension and decodes only JPEG, PNG and
+GIF (`lib/FsHelpers`, `ImageDecoderFactory`). Other formats, such as WebP or SVG, are
+left out of the page, or replaced by `[Image: alt text]` when the image has alt text.
+A WebP cover produces no home-screen or sleep cover. The Preview step lists these
+images under **On your X4 Pro**. Emend does not convert image formats.
+
+Elements hidden only by `font-size: 0` and `height: 0` stay visible on CrossPoint: it
+rejects a zero font size and applies `height` only to images. `display: none` hides them.
+
 ## What Emend does
 
 **Refine → Text size on your reader** finds `font-size` values in plain `html`, `body`
@@ -46,4 +57,5 @@ but on CrossPoint only their paragraph spacing has an effect.
 - [CSS parser: supported selectors and ignored at-rules](https://github.com/crosspoint-reader/crosspoint-reader/blob/2.0.0rc/lib/Epub/Epub/css/CssParser.h)
 - [CSS properties read and `font-size` keyword scale](https://github.com/crosspoint-reader/crosspoint-reader/blob/2.0.0rc/lib/Epub/Epub/css/CssParser.cpp)
 - [Style model](https://github.com/crosspoint-reader/crosspoint-reader/blob/2.0.0rc/lib/Epub/Epub/css/CssStyle.h)
+- [Image decoders by extension](https://github.com/crosspoint-reader/crosspoint-reader/blob/2.0.0rc/lib/FsHelpers/FsHelpers.cpp)
 - [Reader settings in the user guide](https://github.com/crosspoint-reader/crosspoint-reader/blob/2.0.0rc/USER_GUIDE.md)

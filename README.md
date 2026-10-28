@@ -82,6 +82,8 @@ The import starts at once and runs by itself; the page follows its progress:
 3. **Preview:** reader-sized paginated pages (scrolling for books paginated preview
    cannot handle) are rendered from the current file, followed by the font and
    footnote inventory.
+   **On your X4 Pro** lists covers and images in formats CrossPoint cannot decode
+   (it shows only JPEG, PNG and GIF).
 
 Each book page shows six steps: **Import, Check, Repair, Preview, Refine, Send**.
 It opens on the step that needs you; a checked book opens on its pages, with

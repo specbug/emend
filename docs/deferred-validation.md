@@ -11,6 +11,8 @@ Further validation needs real library/device access or a broader corpus:
 - Confirm on the X4 Pro that a text-size reset makes body text follow **Reader Font Size**, that the book's
   line height has no effect, and that embedded fonts are ignored. The CrossPoint behaviour in
   [CrossPoint typography](crosspoint-typography.md) comes from reading the pinned 2.0.0-rc source.
+- Confirm on the X4 Pro that WebP covers and images are absent (or shown as alt text), and on the iPad
+  that Apple Books shows them and presents Pandoc footnotes as expected.
 - Open replaced covers in Calibre on the Mac and on the intended reader. Browser comparison does not certify ebook-reader rendering.
 - Exercise more real-world cover declarations, image reuse, unusual colour profiles, palettes/transparency, translated editions, and multi-author collections. Missing/ambiguous/SVG cover declarations remain unsupported for replacement.
 - Verify a successful live Google Books response when quota permits. HTTP 429 is reported as a provider failure, not corroboration.
