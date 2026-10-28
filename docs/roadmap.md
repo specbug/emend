@@ -13,9 +13,17 @@ CrossPoint handoff. These changes expose the existing preservation rules; they
 do not introduce unrestricted automatic repair or device-cache generation.
 
 Version 0.20 adds reviewed repair of empty EPUB 2 root language attributes and
-block-only paragraph wrappers in EPUB 2/3, through **Find available fixes → Fix
-HTML markup**. Independent tree/resource comparison and required validators
-still gate activation; arbitrary markup repair remains outside this scope.
+block-only paragraph wrappers in EPUB 2/3. Independent tree/resource comparison and
+required validators still gate activation; arbitrary markup repair remains outside
+this scope.
+
+Version 0.21 redesigns the workspace around one automatic run per import: keep and
+check the original, apply the supported repairs through their existing gates, and
+render reader pages. Each book then shows **Import → Check → Repair → Preview →
+Refine → Send**, opens on the step that needs attention, and explains failures with
+the validator's messages, what was tried and the next steps. Spacing refinement
+compares baseline and adjusted pages before an explicit apply and can return to the
+baseline. No new repair kinds, editing operations or input formats were added.
 
 ## Implemented workflow
 

@@ -68,20 +68,42 @@ uv run --extra visual emend review
 
 Open the session URL printed in the terminal. The workspace binds only to `127.0.0.1`; keep that URL private and stop the server with Ctrl+C. Use `--port 0` to select an available port. No separate web account or subscription is needed.
 
-Import an EPUB (up to 128 MiB, or your configured archive limit if lower).
-Known books open without resetting their curated edits. Each book follows three steps:
+Choose or drop an EPUB (up to 128 MiB, or your configured archive limit if lower).
+The import starts at once and runs by itself; the page follows its progress:
 
-1. **Check & fix:** see the actual validator errors and available supported fixes.
-   Use **Find available fixes**, then explicitly apply a named repair such as
-   **Fix EPUB packaging** or **Fix HTML markup**. An empty repair scan explains that manual editing is
-   needed; it never claims the book was fixed. Missing checkers have setup guidance.
-2. **Preview:** inspect page samples. Optional sections contain spacing comparisons,
-   font/footnote checks, edition research and cover changes. Spacing presets only
-   create a comparison; **Apply this spacing** is a separate explicit action.
-3. **Send:** download the approved EPUB for CrossPoint's file-transfer page, or
-   use configured Calibre/Drive/reader-folder destinations. Sending controls stay
-   disabled while required checks are unresolved. Errors keep you on the book page
-   with the blockers and next steps visible.
+1. **Keep and check:** the original is stored byte for byte, inspected, and checked
+   by the required validators.
+2. **Repair:** when required checks fail, Emend prepares a repair plan and applies
+   each supported repair (EPUB packaging, case-only contents links, empty EPUB 2
+   root languages and block-only paragraph wrappers) through the same gated path as
+   `apply-repairs`. Each candidate is independently compared with the current book
+   and must pass the required validators; a rejected candidate leaves the previous
+   version in place and the page shows the errors found in that candidate.
+3. **Preview:** reader-sized paginated pages (scrolling for books paginated preview
+   cannot handle) are rendered from the current file, followed by the font and
+   footnote inventory.
+
+Each book page shows six steps: **Import, Check, Repair, Preview, Refine, Send**.
+It opens on the step that needs you; a checked book opens on its pages, with
+**Download EPUB** in the header. When something stops the book, **What went wrong**
+gives the validator's actual messages and file locations, what Emend already tried,
+and ordered next steps (tool setup, or the manual Calibre edit for errors without a
+supported repair). **Run everything again** re-checks the current file and retries
+the supported repairs. Known books open without resetting their curated edits.
+
+**Refine** is optional and comes afterwards. Choose a spacing (Compact, Comfortable,
+Roomy or exact values) to render the baseline and adjusted pages from the same file,
+then compare them side by side or one at a time. Nothing changes until **Apply this
+spacing**, which applies to every chapter unless you untick it and re-renders the
+pages. After applying, the comparison stays as baseline versus adjustment, and
+**Return to the baseline** restores the previous checked version through recovery.
+Edition lookups, suggested details and covers sit in the same step and still need an
+explicit save. Font-family and text-size changes are not supported.
+
+**Send** downloads the checked EPUB for CrossPoint's file-transfer page, or uses
+configured Calibre/Drive/reader-folder destinations. Sending stays disabled while
+required checks are unresolved; a refused action keeps you on the book with the
+blockers visible. The workspace accepts EPUB files only; convert PDFs elsewhere first.
 
 **Download EPUB** rechecks the same approval, policy, engine and identity gates as
 publication, then streams a hash-verified bounded snapshot. It does not call Calibre,
@@ -98,9 +120,11 @@ These observations are advisory, not device certification. See
 [CrossPoint covers](docs/crosspoint-covers.md) for library-grid/sleep troubleshooting.
 
 The workspace binds to loopback with session/CSRF/origin/Host checks and isolated
-saved reports. GET never starts lookups, edits or checks. Long checks may take a
-minute; let the submitted action finish before retrying. The CLI remains available
-for larger imports, recovery and advanced inspection.
+saved reports. GET never starts lookups, edits or checks; page images are served only
+after their recorded hashes match. One run works at a time in the background and
+holds the workspace lock; other actions wait for it. Pages update through a small
+same-origin script and still work without it. The CLI remains available for larger
+imports, recovery and advanced inspection.
 
 ## Inspect and import an EPUB
 
@@ -240,7 +264,7 @@ The plan records the current EPUB/report hashes, quality policy, and inspection 
   other attributes are retained; stylesheets are not changed. Element-specific
   CSS can render the repaired wrapper differently, so preview the affected pages.
 
-Use **Find available fixes → Fix HTML markup** in the review workspace, or:
+The review workspace applies this repair automatically after import or **Run everything again**, or:
 
 ```sh
 uv run emend repair-plan BOOK_ID

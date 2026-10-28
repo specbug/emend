@@ -362,3 +362,26 @@ private book or device cache was accessed or modified by these tests.
 Completion notices are now scoped to their book and consumed once. Generic and
 unauthenticated error pages never display a private backup/transfer notice; two
 regression cases cover that boundary and cross-book message reuse.
+
+## Workspace redesign (0.21)
+
+The workspace UI was rebuilt around one background run per import and six book
+steps. Backend operations are unchanged; the run calls `ingest_new`, `revalidate`,
+`prepare_repairs`/`apply_repairs`, `visual_review` and `reading_review` through
+their existing gates. Workspace tests cover: a damaged-container upload repaired
+and validated without further clicks while the original keeps its hash; a re-upload
+of a known book leaving it unchanged; read-only progress polling and a 409 for
+actions during a run; a failed preview surfacing its reason; verified page-image
+serving that refuses unknown files and changed bytes; spacing compare → apply to
+every chapter → return to the baseline through recovery; import while busy staying
+on the shelf; package-only static assets; and a CSP with no inline script or style.
+Unsupported validator errors keep the exact messages and manual steps, and sending
+stays disabled.
+
+Real Chromium (Playwright's bundled build) drove import, automatic repair, preview,
+download, cover review/application, missing-cover creation and recovery. Synthetic
+multi-chapter books were rendered in light and dark schemes at 1280 and 390 px for
+the shelf, running, ready, blocked, rejected-repair, comparison and applied states;
+no horizontal overflow was found and the screens were inspected visually. Official
+EPUBCheck, Ace and Calibre were not run for this change; fixture validators were
+used. No personal books, Drive account or reader hardware were involved.
