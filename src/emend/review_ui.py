@@ -477,7 +477,26 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,su
                     body += "<p>Install the missing checker above before applying this fix.</p>"
                 body += review("repairs", "Proposed fix")
             elif problems:
-                body += "<h3>No automatic fix for these problems</h3><p>This scan found no fix Emend can safely apply. Use Calibre’s <strong>Edit book → Tools → Check book</strong> to inspect the listed file errors. Save an edited EPUB outside your Calibre library and import that file into Emend for fresh checks.</p><p>Emend currently fixes EPUB packaging and certain broken contents links. It cannot repair every validator or accessibility error.</p>"
+                body += (
+                    "<h3>No automatic fix for these problems</h3>"
+                    "<p>This scan found no fix Emend can safely apply. In Calibre’s "
+                    "<strong>Edit book</strong>, open the files named below and inspect the "
+                    "reported lines. Calibre’s <strong>Tools → Check book</strong> runs "
+                    "different checks from EPUBCheck: “No problems found” there does not "
+                    "mean these EPUBCheck errors are resolved.</p>"
+                    "<p>Invalid <code>lang</code> or <code>xml:lang</code> values need valid "
+                    "language tags matching the text, such as <code>en</code> for English. "
+                    "For an element “not allowed here”, inspect its surrounding tags; "
+                    "headings and lists cannot sit inside a paragraph. The exact repair "
+                    "depends on that file’s markup.</p>"
+                    "<p>Save your edits and export an EPUB copy outside your Calibre library, "
+                    "then import that copy into Emend for fresh checks. Emend keeps its "
+                    "own copy; “Run checks again” does not reload edits from Calibre.</p>"
+                    '<p><a href="https://github.com/specbug/emend/blob/main/docs/epubcheck-troubleshooting.md" '
+                    'target="_blank" rel="noopener noreferrer">How to inspect these errors</a>. '
+                    "Emend currently fixes EPUB packaging and certain broken contents "
+                    "links. It cannot repair every validator or accessibility error.</p>"
+                )
         elif problems and not missing_tool:
             body += form("repair-plan", "Find available fixes")
             body += '<p class="quiet">Looks for supported fixes without changing the book. You choose whether to apply them.</p>'

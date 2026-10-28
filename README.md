@@ -120,6 +120,11 @@ Structural errors or failed required validators produce `FAILED`. Missing requir
 
 Warnings about publisher styles, missing alt text, duplicate chapter text, or replacement characters are observations; Emend never silently rewrites them. Multi-rendition, DRM-encrypted, scripted, responsive-source-set, and remotely embedded content require manual review in this version. Font obfuscation is retained.
 
+Calibre’s **Check book** and EPUBCheck run different checks. Calibre can report
+“No problems found” while the same EPUB still fails EPUBCheck. For unsupported
+errors, inspect the reported source lines in **Edit book**, then save and import
+an edited EPUB copy. See [EPUBCheck troubleshooting](docs/epubcheck-troubleshooting.md).
+
 ## Import from an inbox
 
 ```sh
