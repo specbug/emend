@@ -1018,5 +1018,55 @@ def library_command(
         fail(exc)
 
 
+@app.command("image-conversion-trial")
+def image_conversion_trial_command(
+    book_id: str,
+    config: ConfigOption = None,
+    layout: str = "paginated",
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Compare explicit PNG/baseline-JPEG conversion; keep the current EPUB unchanged."""
+    from emend.image_conversion import image_conversion_trial, summary
+
+    try:
+        settings = load_config(config)
+        trial = image_conversion_trial(book_id, settings, layout=layout)
+        path = Store(settings.root).document(trial.book_id, "image-conversion-trial", trial.id)[
+            "path"
+        ]
+        typer.echo(
+            trial.model_dump_json(indent=2)
+            if as_json
+            else f"Comparison: {trial.id}\nStatus: {trial.status}\n{summary(trial.plan)}\nBook size: {trial.before_bytes:,} → {trial.after_bytes:,} bytes\nOpen: {Path(path).with_suffix('.html')}\nEPUB and quality state unchanged."
+        )
+        if trial.status != "complete":
+            raise typer.Exit(1)
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
+@app.command("apply-image-conversion")
+def apply_image_conversion_command(
+    book_id: str,
+    trial: Annotated[str, typer.Option("--trial")],
+    approve: bool = False,
+    config: ConfigOption = None,
+    as_json: Annotated[bool, typer.Option("--json")] = False,
+):
+    """Apply an approved, current image conversion only after preservation and validation."""
+    from emend.image_conversion import ImageConversionRejectedError, apply_image_conversion
+
+    try:
+        report = apply_image_conversion(
+            book_id, load_config(config), trial_id=trial, approve=approve
+        )
+        typer.echo(report.model_dump_json(indent=2) if as_json else report_text(report))
+    except ImageConversionRejectedError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    except (ValueError, OSError) as exc:
+        fail(exc)
+
+
 if __name__ == "__main__":
     app()

@@ -30,6 +30,26 @@ def read_report(path):
     return Report.model_validate_json(data)
 
 
+def conversion_history(store, row, base):
+    """Keep conversion audit records even when recovery selects an older revision."""
+    records = list(base.image_conversions)
+    try:
+        path = Path(row["report_path"] or "")
+        if path.resolve().is_relative_to((store.root / "reports" / row["id"]).resolve()):
+            current = read_report(path)
+            if current.book_id == row["id"]:
+                known = {(c.trial_id, c.after_sha256) for c in records}
+                records.extend(
+                    c
+                    for c in current.image_conversions
+                    if (c.trial_id, c.after_sha256) not in known
+                )
+    except (ValueError, OSError):
+        # Recovery must still work when the damaged current report cannot be read.
+        pass
+    return records
+
+
 def approved(report, book):
     gates = {g.name: g for g in report.gates}
     return (
@@ -187,6 +207,7 @@ def recover(
                     "parent_report_path": row["report_path"],
                     "parent_artifact_sha256": None,
                     "recovery_changes": [*base.recovery_changes, change],
+                    "image_conversions": conversion_history(store, row, base),
                     "changes": [
                         *base.changes,
                         f"Explicit recovery selected {digest}; approval revoked before replacement. Prior artifact quarantine (if present): {quarantine}.",

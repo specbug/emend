@@ -82,6 +82,13 @@ Keep reader compatibility claims tied to actual device evidence.
   docs/crosspoint-typography.md). Verify untouched CSS bytes and parsed rules
   independently, keep `text_size_changes` through later edits, and never touch
   class/id, heading, inline, @media or absolute sizes.
+- `image_conversion.py`, `image_references.py`: explicit, compared raster-format
+  conversion. Preserve dimensions, ICC profiles, text, spine, IDs and unrelated
+  bytes. Reparse XML/CSS and independently check every changed reference and image
+  pixels before validation/activation. PNG pixels must match exactly; JPEG has a
+  stated error bound. Keep `image_conversions` through later edits and recovery.
+  Never auto-apply conversion during import, resize images, rasterise SVG or
+  partially rewrite an unsafe reference graph.
 - `reading_review.py`: bounded offline font/marked-note/direction evidence.
   Keep source observations distinct from glyph coverage, reader behavior and
   accessibility conformance; limits must produce incomplete evidence.

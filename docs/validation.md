@@ -1,5 +1,37 @@
 # Validation evidence
 
+## Explicit image-format conversion — 0.24
+
+Verified with Pillow WebP decoding, official EPUBCheck 5.3.0, Chromium and Calibre
+9.17.0 on Linux. Original generated fixtures cover EPUB 2/3, lossless/alpha PNG,
+baseline JPEG, ICC profiles, dimensions, SVG-wrapped images, CSS/style/srcset and
+percent-encoded references, manifest cover/fallback IDs, collisions, bounds,
+animation/vector/corrupt-image skips, unsafe-reference refusal, independent
+preservation, stale/tampered comparisons, validator/activation rollback, and
+conversion history through text-size, metadata, revalidation and recovery. The
+final focused image/recovery/guidance/text-size/UI run passes 151 cases. Local
+full-suite runs report five opt-in Ace skips separately; hosted CI runs Ace.
+
+A generated 327-WebP, 35-spine-document book completed the actual workspace flow:
+upload/import → preview → compare conversion → apply → download, using real
+Chromium and EPUBCheck. It produced 40 PNGs and 287 baseline JPEGs, with no skips;
+the book grew from about 2.35 MB to 4.69 MB. The downloaded bytes matched approval,
+reading-text fingerprints stayed intact, all converted hrefs ended in jpg/png,
+and WebP notes disappeared. Baseline/converted colour and alpha page samples were
+inspected; workspace comparisons at 1280 and 390 px had no horizontal overflow.
+A separate browser regression completes comparison/application/download without
+JavaScript. The installed 0.24.0 wheel also completes CLI ingest → compared trial →
+approved conversion with the real validators/browser from outside the repository.
+Source/wheel builds, lint and formatting pass.
+
+The large private-book acceptance requested for this conversion could not be run
+here because the cloud network policy blocks its Drive download. These generated
+results do not substitute for that acceptance; no private book, identifying
+details, links or generated workspace data are committed. X4 Pro and iPad rendering
+remain pending device checks. CrossPoint limits/decoders are confirmed against
+pinned `2.0.0rc` (`91ed3ef`) source in the paths cited in
+[CrossPoint images](crosspoint-typography.md#images-and-covers), not on hardware.
+
 ## Reviewed HTML markup repairs — 0.20
 
 The local suite passes **583 tests**, with five opt-in Ace integrations skipped;

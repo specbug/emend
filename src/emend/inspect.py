@@ -516,12 +516,13 @@ class Inspector:
                 if href is not None and (attr != "data" or tag == "object"):
                     self.link(path, href, resource=tag not in {"a", "content"})
             if element.get("srcset"):
-                self.add(
-                    "resource.srcset",
-                    "error",
-                    "Responsive image source sets require manual review in this version.",
-                    path,
-                )
+                from emend.image_references import srcset_urls
+
+                try:
+                    for _, _, url in srcset_urls(element.get("srcset")):
+                        self.link(path, url, resource=True)
+                except ValueError as exc:
+                    self.add("resource.srcset", "error", str(exc), path)
             if tag == "img" and element.get("alt") is None:
                 self.add("accessibility.alt", "warning", "Image lacks alt text.", path)
             if element.get("style"):

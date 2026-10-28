@@ -410,3 +410,35 @@ def apply_size(run, config, book, trial_id):
 
 def plural(count, word):
     return f"{count} {word if count == 1 else word + 's'}"
+
+
+def image_trial(run, config, book, layout):
+    from emend.image_conversion import image_conversion_trial
+
+    run.begin("trial")
+    try:
+        trial = image_conversion_trial(book, config, max_documents=PREVIEW_DOCUMENTS, layout=layout)
+    except ValueError as exc:
+        if layout != "paginated" or "layout scroll" not in str(exc):
+            raise
+        trial = image_conversion_trial(
+            book, config, max_documents=PREVIEW_DOCUMENTS, layout="scroll"
+        )
+    run.end(
+        "trial",
+        "done" if trial.status == "complete" else "failed",
+        "Baseline and converted pages rendered; nothing in the book has changed.",
+    )
+    run.notice = "Image comparison ready. Review the converted pages before applying."
+
+
+def apply_images(run, config, book, trial_id):
+    from emend.image_conversion import apply_image_conversion
+
+    run.begin("apply")
+    apply_image_conversion(book, config, trial_id=trial_id, approve=True)
+    run.end(
+        "apply", "done", "Image formats converted; preservation and required validators passed."
+    )
+    preview(run, config, book)
+    run.notice = "Images converted. The comparison with the baseline is kept below."

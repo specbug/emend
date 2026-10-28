@@ -6,6 +6,13 @@ skips; [the Mac runbook](mac-validation.md) makes the local checks repeatable.
 
 Further validation needs real library/device access or a broader corpus:
 
+- Confirm converted covers, inline illustrations, transparency, colour and
+  footnotes on the X4 Pro and iPad. Image conversion is checked by decoded-pixel,
+  reference, archive and validator tests; firmware behavior is from pinned source,
+  not a device test. Verify oversize-image advisories and fresh CrossPoint caches
+  on hardware. Private real-book end-to-end acceptance remains separate from
+  generated-fixture results.
+
 - Broaden the automated Ace corpus beyond original EPUB 2/3 fixtures, and perform screen-reader, reading-order, alternative-text quality, footnote, contrast, and resizing reviews. An automated audit alone cannot establish accessibility conformance.
 - Calibrate scrolling and paginated Chromium previews against actual readers, obfuscated fonts, fixed layouts, vertical writing, and interactive footnotes. Paginated mode currently supports only horizontal LTR reflowable content. The generic browser sizes are not device profiles.
 - Confirm on the X4 Pro that a text-size reset makes body text follow **Reader Font Size**, that the book's
