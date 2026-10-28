@@ -270,7 +270,7 @@ def test_epub3_empty_languages_are_valid_and_not_offered_for_repair(tmp_path, co
     assert plan.actions == []
 
 
-def test_browser_can_rescan_old_empty_plan_fix_markup_then_download(
+def test_browser_rerun_replaces_old_empty_plan_with_markup_fix_then_download(
     workspace, tmp_path, browser_config, monkeypatch
 ):
     from playwright.sync_api import sync_playwright
@@ -296,15 +296,19 @@ def test_browser_can_rescan_old_empty_plan_fix_markup_then_download(
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
         page.goto(workspace.entry_url)
         page.goto(f"http://127.0.0.1:{workspace.server_port}/books/{before.book_id}")
-        page.get_by_role("button", name="Find available fixes", exact=True).click()
-        assert page.get_by_role("button", name="Fix HTML markup", exact=True).is_visible()
+        # The stale empty scan is shown as tried; a fresh run finds and applies the repair.
+        assert page.get_by_text("No safe repair", exact=True).first.is_visible()
         for width in (1280, 390):
             page.set_viewport_size({"width": width, "height": 1000})
             page.evaluate("document.fonts.ready")
             assert page.evaluate("document.documentElement.scrollWidth") == width
             page.screenshot(path=str(tmp_path / f"markup-repair-{width}.png"), full_page=True)
-        page.get_by_role("button", name="Fix HTML markup", exact=True).click()
-        assert page.get_by_text("Checks passed · ready to send", exact=True).is_visible()
+        page.set_viewport_size({"width": 1280, "height": 1000})
+        page.get_by_role("button", name="Run everything again", exact=True).click()
+        page.get_by_role("link", name="Download EPUB", exact=True).wait_for(timeout=120000)
+        assert page.get_by_text("Checked and ready to send", exact=True).is_visible()
+        page.get_by_role("link", name="Repair").first.click()
+        assert page.get_by_text("Fix HTML markup", exact=True).is_visible()
         after = get_report(Store(browser_config.root), before.book_id)
         with page.expect_download() as event:
             page.get_by_role("link", name="Download EPUB", exact=True).click()
