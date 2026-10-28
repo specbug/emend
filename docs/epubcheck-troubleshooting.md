@@ -7,11 +7,12 @@ that the EPUB passes EPUBCheck. Emend requires EPUBCheck by default.
 
 First make sure you are comparing the same version of the book. Emend keeps its
 own preserved copy; editing the Calibre library file does not update that copy.
-**Run checks again** checks Emend’s current file, not a newly edited Calibre file.
+**Run everything again** checks Emend’s current file, not a newly edited Calibre file.
 
-First try **Find available fixes** in Emend. If it offers **Fix HTML markup**,
-review the proposal and apply it there: you do not need to edit or reimport a copy
-manually. Emend now repairs empty EPUB 2 root language attributes from one
+Emend tries its supported repairs by itself after import and on **Run everything
+again**; the book's **Repair** step lists what it applied, with a link to the exact
+change. If **Fix HTML markup** was applied, you do not need to edit or reimport a copy
+manually. Emend repairs empty EPUB 2 root language attributes from one
 unambiguous package language and block-only paragraph wrappers inside `body` or
 `div`. Nonempty language values, mixed prose and uncertain nesting remain manual.
 

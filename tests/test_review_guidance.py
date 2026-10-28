@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
+from emend.inspect import sha256_file
 from emend.pipeline import get_report, ingest
-from emend.revalidation import revalidate
 from emend.review_guidance import epubcheck_messages
 from emend.storage import Store
 from tests.epub_factory import write_epub
@@ -49,26 +49,35 @@ def test_failed_book_shows_real_errors_and_sending_is_disabled(workspace, tmp_pa
     before = blocked(tmp_path, config)
     cookie = login(workspace)
     status, _, body = request(workspace, "/books/" + before.book_id, headers={"Cookie": cookie})
-    assert status == 200 and "Needs attention before sending" in body
+    assert status == 200 and "Needs you before it can be sent" in body
+    assert 'aria-current="step"' in body and "What went wrong" in body
+    assert "EPUBCheck found 1 error in 1 file." in body
     assert "Element &lt;bad&gt; is not allowed here." in body
     assert "EPUB/chapter.xhtml:7" in body
-    assert "Find available fixes" in body
-    assert "<button disabled>Download EPUB</button>" in body
+    assert "Run everything again" in body
     assert f'href="/books/{before.book_id}/download"' not in body
-    assert "Saved review evidence" not in body and "Current artifact" not in body
+    body = request(
+        workspace, "/books/" + before.book_id + "?step=send", headers={"Cookie": cookie}
+    )[2]
+    assert 'type="button" disabled>Download EPUB</button>' in body
+    assert f'href="/books/{before.book_id}/download"' not in body
     assert get_report(Store(config.root), before.book_id) == before
 
 
-def test_unsupported_fix_explains_manual_next_step(workspace, tmp_path, config):
+def test_unsupported_fix_explains_manual_next_step(workspace, tmp_path, config, fake_pages):
     before = blocked(tmp_path, config)
     cookie = login(workspace)
-    assert post(workspace, cookie, fields(workspace, before, "repair-plan"))[0] == 303
+    assert post(workspace, cookie, fields(workspace, before, "revalidate"))[0] == 303
+    run = workspace.app.runner.get(before.book_id)
+    assert run.step("repair").note == "No supported repair applies to these problems."
     body = request(workspace, "/books/" + before.book_id, headers={"Cookie": cookie})[2]
-    assert "No automatic fix for these problems" in body
+    assert "none applies to these problems" in body and "No safe repair" in body
     assert "Tools → Check book" in body
     assert "Element &lt;bad&gt; is not allowed here." in body
     assert "Fix EPUB packaging" not in body and "Fix contents links" not in body
-    assert get_report(Store(config.root), before.book_id) == before
+    after = get_report(Store(config.root), before.book_id)
+    assert after.state == "FAILED" and not after.repair_changes
+    assert Store(config.root).resolve(before.book_id)["artifact_path"] is None
 
 
 def test_publish_and_download_refusals_stay_on_the_book(
@@ -82,6 +91,7 @@ def test_publish_and_download_refusals_stay_on_the_book(
     assert status == 400 and "The Quiet Observatory" in body
     assert "That step could not finish" in body and "Element &lt;bad&gt;" in body
     assert "See checks and next steps" in body and "Review request" not in body
+    assert 'type="button" disabled>Download EPUB</button>' in body
     assert not (config.publish.calibre_library / "fake-published.json").exists()
     status, headers, data = raw_download(workspace, before.book_id, cookie)
     assert status == 400 and "Content-Disposition" not in headers
@@ -89,31 +99,35 @@ def test_publish_and_download_refusals_stay_on_the_book(
     assert get_report(Store(config.root), before.book_id) == before
 
 
-def test_available_fix_has_named_button_and_stale_report_requires_new_scan(
-    workspace, tmp_path, config
-):
+def test_supported_fix_is_applied_by_a_run_and_named(workspace, tmp_path, config, fake_pages):
     before = ingest(damaged_epub(tmp_path / "broken.epub"), config)
     cookie = login(workspace)
-    assert post(workspace, cookie, fields(workspace, before, "repair-plan"))[0] == 303
     body = request(workspace, "/books/" + before.book_id, headers={"Cookie": cookie})[2]
-    assert "Fix EPUB packaging" in body and "Available fix" in body
-    revalidate(before.book_id, config)
-    body = request(workspace, "/books/" + before.book_id, headers={"Cookie": cookie})[2]
-    assert "Fix EPUB packaging" not in body and "Find available fixes" in body
+    assert "Not tried" in body and "let Emend try its supported repairs" in body
+    assert post(workspace, cookie, fields(workspace, before, "revalidate"))[0] == 303
+    after = get_report(Store(config.root), before.book_id)
+    assert after.state == "VALIDATED" and after.repair_changes
+    assert sha256_file(config.root / "originals" / f"{before.book_id}.epub") == before.book_id
+    body = request(
+        workspace, "/books/" + before.book_id + "?step=repair", headers={"Cookie": cookie}
+    )[2]
+    assert "Fix EPUB packaging" in body and "See exactly what changed" in body
+    assert "1 repair applied" in body
 
 
-def test_missing_checker_has_setup_and_refresh_action(workspace, tmp_path, config):
+def test_missing_checker_has_setup_and_refresh_action(workspace, tmp_path, config, fake_pages):
     good = config.tools.epubcheck
     config.tools.epubcheck = tmp_path / "missing"
     before = ingest(write_epub(tmp_path / "book.epub"), config)
     cookie = login(workspace)
     body = request(workspace, "/books/" + before.book_id, headers={"Cookie": cookie})[2]
-    assert "brew install epubcheck" in body and "Run checks again" in body
+    assert "brew install epubcheck" in body and "Run everything again" in body
+    assert "EPUB validation is not installed" in body and "Checker missing" in body
     assert "Download EPUB</a>" not in body
     config.tools.epubcheck = good
     assert post(workspace, cookie, fields(workspace, before, "revalidate"))[0] == 303
     body = request(workspace, "/books/" + before.book_id, headers={"Cookie": cookie})[2]
-    assert "Checks passed · ready to send" in body and "Download EPUB</a>" in body
+    assert "Checked and ready to send" in body and "Download EPUB</a>" in body
 
 
 def test_download_uses_approved_bytes_without_publishing_or_changing_state(
@@ -198,10 +212,16 @@ def test_unreadable_validator_evidence_does_not_turn_into_a_pass(workspace, tmp_
     cookie = login(workspace)
     body = request(workspace, "/books/" + report.book_id, headers={"Cookie": cookie})[2]
     assert "detailed validator report could not be read" in body
-    assert "<button disabled>Download EPUB</button>" in body
+    assert "Download EPUB</a>" not in body
+    body = request(
+        workspace, "/books/" + report.book_id + "?step=send", headers={"Cookie": cookie}
+    )[2]
+    assert 'type="button" disabled>Download EPUB</button>' in body
 
 
-def test_spacing_preset_has_separate_preview_and_apply(workspace, tmp_path, config, fake_capture):
+def test_spacing_preset_has_separate_preview_and_apply(
+    workspace, tmp_path, config, fake_capture, fake_pages
+):
     from emend.typography import load_trial
 
     before = ingest(write_epub(tmp_path / "book.epub"), config)
@@ -213,29 +233,30 @@ def test_spacing_preset_has_separate_preview_and_apply(workspace, tmp_path, conf
             workspace, before, "typography-trial", spacing_preset="comfortable", layout="scroll"
         ),
     )
-    assert status == 303 and "panel=spacing" in headers["Location"]
+    assert status == 303 and "step=refine" in headers["Location"]
     trial = load_trial(Store(config.root), before.book_id)
     assert trial.settings.line_height == 1.55 and trial.settings.paragraph_gap == 0.55
     assert get_report(Store(config.root), before.book_id) == before
-    body = request(
-        workspace, "/books/" + before.book_id + "?panel=spacing", headers={"Cookie": cookie}
-    )[2]
-    assert 'id="spacing" open' in body and "Apply this spacing" in body
+    body = request(workspace, "/books/" + before.book_id, headers={"Cookie": cookie})[2]
+    # A comparison waiting for a decision is where the book opens.
+    assert "Comparison to review" in body and "Apply this spacing" in body
     assert (
         post(workspace, cookie, fields(workspace, before, "apply-typography", trial=trial.id))[0]
         == 303
     )
     body = request(
-        workspace, "/books/" + before.book_id + "?panel=spacing", headers={"Cookie": cookie}
+        workspace, "/books/" + before.book_id + "?step=refine", headers={"Cookie": cookie}
     )[2]
-    assert "Applied; kept for reference" in body
+    assert "Applied to the book" in body and "Spacing adjusted" in body
     assert "Apply this spacing" not in body
 
 
-def test_browser_can_find_fix_and_download_without_a_dead_end(workspace, tmp_path, browser_config):
+def test_browser_repairs_on_import_and_downloads_without_a_dead_end(
+    workspace, tmp_path, browser_config
+):
     from playwright.sync_api import sync_playwright
 
-    before = ingest(damaged_epub(tmp_path / "repairable.epub"), browser_config)
+    source = damaged_epub(tmp_path / "repairable.epub")
     with sync_playwright() as p:
         browser = p.chromium.launch(
             executable_path=str(browser_config.tools.chromium)
@@ -244,23 +265,19 @@ def test_browser_can_find_fix_and_download_without_a_dead_end(workspace, tmp_pat
         )
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
         page.goto(workspace.entry_url)
-        page.goto(f"http://127.0.0.1:{workspace.server_port}/books/{before.book_id}")
-        assert page.get_by_role("button", name="Download EPUB", exact=True).is_disabled()
+        page.get_by_label("Choose an EPUB").set_input_files(source)
+        page.get_by_text("Working on it").wait_for(timeout=30000)
         for width in (1280, 390):
             page.set_viewport_size({"width": width, "height": 1000})
-            page.evaluate("document.fonts.ready")
             assert page.evaluate("document.documentElement.scrollWidth") == width
-            page.screenshot(path=str(tmp_path / f"blocked-{width}.png"), full_page=True)
-        page.get_by_role("button", name="Find available fixes", exact=True).click()
-        assert page.get_by_role("button", name="Fix EPUB packaging", exact=True).is_visible()
-        for width in (1280, 390):
-            page.set_viewport_size({"width": width, "height": 1000})
-            page.screenshot(path=str(tmp_path / f"fix-available-{width}.png"), full_page=True)
-        page.get_by_role("button", name="Fix EPUB packaging", exact=True).click()
-        after = get_report(Store(browser_config.root), before.book_id)
+        page.set_viewport_size({"width": 1280, "height": 1000})
+        page.get_by_role("link", name="Download EPUB", exact=True).wait_for(timeout=120000)
+        book = sha256_file(source)
+        after = get_report(Store(browser_config.root), book)
         assert after.state == "VALIDATED" and after.repair_changes
-        assert page.get_by_text("Checks passed · ready to send", exact=True).is_visible()
-        assert not page.locator("#spacing").get_attribute("open")
+        assert page.get_by_text("Checked and ready to send", exact=True).is_visible()
+        page.get_by_role("link", name="Repair").first.click()
+        assert page.get_by_text("Fix EPUB packaging", exact=True).is_visible()
         with page.expect_download() as download_event:
             page.get_by_role("link", name="Download EPUB", exact=True).click()
         downloaded = download_event.value
@@ -269,6 +286,7 @@ def test_browser_can_find_fix_and_download_without_a_dead_end(workspace, tmp_pat
         assert hashlib.sha256(target.read_bytes()).hexdigest() == after.artifact_sha256
         for width in (1280, 390):
             page.set_viewport_size({"width": width, "height": 1000})
+            page.evaluate("document.fonts.ready")
             assert page.evaluate("document.documentElement.scrollWidth") == width
             page.screenshot(path=str(tmp_path / f"ready-{width}.png"), full_page=True)
         browser.close()
@@ -292,10 +310,9 @@ def test_browser_unfixable_book_explains_blockers_and_keeps_user_in_context(
         assert page.get_by_text(
             "Element <bad> is not allowed here.", exact=False
         ).first.is_visible()
-        page.get_by_role("button", name="Find available fixes", exact=True).click()
-        assert page.get_by_role(
-            "heading", name="No automatic fix for these problems", exact=True
-        ).is_visible()
+        page.get_by_role("button", name="Run everything again", exact=True).click()
+        page.get_by_text("none applies to these problems", exact=False).wait_for(timeout=120000)
+        assert page.get_by_role("heading", name="EPUBCheck found 1 error in 1 file.").is_visible()
         page.goto(f"http://127.0.0.1:{workspace.server_port}/books/{before.book_id}/download")
         assert page.get_by_role("heading", name="The Quiet Observatory", exact=True).is_visible()
         assert page.get_by_role("alert").is_visible()
@@ -411,7 +428,7 @@ def test_calibre_lock_error_offers_download_without_blocking_ready_book(
     assert status == 400 and "Calibre is open" in body
     assert "Calibre’s Add books" in body
     assert f'href="/books/{before.book_id}/download"' in body
-    assert "Checks passed · ready to send" in body
+    assert "Checked and ready to send" in body and 'aria-current="step"' in body
     assert get_report(Store(config.root), before.book_id) == before
 
 
@@ -434,10 +451,11 @@ def test_metadata_save_is_disabled_when_required_checks_fail(workspace, tmp_path
     )
     body = request(
         workspace,
-        "/books/" + before.book_id + "?panel=details",
+        "/books/" + before.book_id + "?step=refine&open=details",
         headers={"Cookie": login(workspace)},
     )[2]
-    assert '<button type="submit" disabled>Save selected book details</button>' in body
+    assert 'id="details" open' in body
+    assert 'data-working="Saving…" disabled>Save selected book details</button>' in body
     assert "Resolve the required check failures before saving book details" in body
 
 

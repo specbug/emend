@@ -167,20 +167,23 @@ def test_real_browser_missing_cover_and_recovery_at_phone_and_desktop(
         )
         page = browser.new_page(viewport={"width": 1280, "height": 1000})
         page.goto(workspace.entry_url)
-        page.goto(f"http://127.0.0.1:{workspace.server_port}/books/{before.book_id}")
+        page.goto(f"http://127.0.0.1:{workspace.server_port}/books/{before.book_id}?step=refine")
         for width in (1280, 390):
             page.set_viewport_size({"width": width, "height": 1000})
             page.evaluate("document.fonts.ready")
             assert page.evaluate("document.documentElement.scrollWidth") == width
             page.screenshot(path=str(tmp_path / f"missing-cover-{width}.png"))
+        page.set_viewport_size({"width": 1280, "height": 1000})
         page.locator("summary").filter(has_text="Book details and cover").click()
         form = page.locator("form").filter(
             has=page.get_by_role("button", name="Create reviewed missing cover", exact=True)
         )
         form.locator('input[name="candidate"]').check()
         form.get_by_role("button", name="Create reviewed missing cover", exact=True).click()
+        page.get_by_text("Cover added to the EPUB").wait_for()
         added = get_report(Store(config.root), before.book_id)
         assert added.cover_additions
+        page.get_by_role("link", name="Send").first.click()
         page.locator("summary").filter(has_text="Technical details and recovery").click()
         page.get_by_role("link", name="Recover original or retained revision", exact=True).click()
         assert page.get_by_role("heading", name="Recover a book", exact=True).is_visible()
@@ -193,6 +196,7 @@ def test_real_browser_missing_cover_and_recovery_at_phone_and_desktop(
         page.get_by_role(
             "button", name="Restore selected revision and revalidate", exact=True
         ).click()
+        page.get_by_role("heading", name="The Quiet Observatory", exact=True).wait_for()
         restored = get_report(Store(config.root), before.book_id)
         assert restored.state == "VALIDATED" and restored.artifact_sha256 == before.book_id
         assert restored.recovery_changes and not restored.cover_additions

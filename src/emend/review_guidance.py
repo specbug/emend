@@ -32,18 +32,31 @@ SPACING_PRESETS = {
 }
 
 
-ACTION_PANELS = {
-    "typography-trial": ("spacing", "spacing"),
-    "apply-typography": ("spacing", "spacing"),
-    "reading": ("reading", "reading"),
+# The workspace step that shows an action's result or its error.
+ACTION_STEPS = {
+    "revalidate": "check",
+    "visual": "preview",
+    "reading": "preview",
+    "typography-trial": "refine",
+    "apply-typography": "refine",
+    "restore-baseline": "refine",
     **{
-        action: ("details", "book-details")
-        for action in ("research", "discover", "choose-edition", "apply-metadata", "ai-review")
+        action: "refine"
+        for action in (
+            "research",
+            "discover",
+            "choose-edition",
+            "apply-metadata",
+            "ai-review",
+            "cover-review",
+            "apply-cover",
+            "create-cover",
+            "cover-local",
+        )
     },
-    **{
-        action: ("details", "cover-review")
-        for action in ("cover-review", "apply-cover", "create-cover", "cover-local")
-    },
+    "publish": "send",
+    "reader-export": "send",
+    "download": "send",
 }
 
 

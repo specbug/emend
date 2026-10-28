@@ -177,7 +177,9 @@ def test_workspace_missing_cover_action(workspace, tmp_path, config):
 
     before, review = prepare(tmp_path, config)
     cookie = login(workspace)
-    status, _, body = request(workspace, "/books/" + before.book_id, headers={"Cookie": cookie})
+    status, _, body = request(
+        workspace, "/books/" + before.book_id + "?step=refine", headers={"Cookie": cookie}
+    )
     assert status == 200 and "Create reviewed missing cover" in body
     assert (
         post(

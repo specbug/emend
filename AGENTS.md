@@ -44,8 +44,11 @@ Keep reader compatibility claims tied to actual device evidence.
   or identifying details. Validator success alone does not establish visual quality.
 - Preserve publisher typography. Emend report styling follows the existing
   [report CSS](src/emend/assets/report.css): warm neutrals, consistent spacing,
-  readable line lengths, responsive layouts, and bundled licensed fonts. Check
-  report changes at desktop and phone widths without horizontal overflow.
+  readable line lengths, responsive layouts, and bundled licensed fonts. The
+  workspace's [design system](src/emend/assets/workspace.css) shares that palette:
+  hairlines over shadows, one accent reserved for work and attention, light and
+  dark schemes. Check report and workspace changes at desktop and phone widths
+  without horizontal overflow.
 
 ## Code map
 
@@ -79,6 +82,13 @@ Keep reader compatibility claims tied to actual device evidence.
 - `review_ui.py`: loopback-only authenticated workspace. Preserve Host/Origin/CSRF
   checks, bounded uploads, isolated evidence, and core mutation gates. GET must
   never trigger edits, provider calls, publishing or other user actions.
+- `workspace_runs.py`: background runs that hold the workspace operation lock. An
+  import (or **Run everything again**) keeps/checks the book, applies only supported
+  repair plans through `apply_repairs`, then renders previews. Runs chain existing
+  gated APIs; never add edits that bypass their preservation checks or approval rules.
+- `workspace_views.py`, `assets/workspace.css`, `assets/workspace.js`: read-only page
+  rendering, hash-verified page images and the workspace design system. Pages must
+  work without the script; keep the CSP free of inline script/style.
 - `reports.py`, `library.py`, `assets/`, `cli.py`: local reports, overview, and CLI.
 - `recovery.py`: restore only the original or a previously approved retained revision. Revoke approval before replacing bytes, quarantine the previous current artifact, and rerun current gates. Carry `recovery_changes` through subsequent edits.
 - `reader_export.py`: byte-verified mounted-folder delivery. Keep native atomic
