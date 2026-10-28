@@ -483,11 +483,16 @@ class ReviewHandler(BaseHTTPRequestHandler):
                         "The EPUB changed while preparing the download. Run checks again."
                     )
                 filename = default_filename(report)
+            # Keep the verified snapshot open and remove staging before any byte is sent,
+            # so cleanup never races the client finishing the download.
+            size = target.stat().st_size
+            stream = target.open("rb")
+        with stream:
             try:
                 self.connection.settimeout(30)
                 self.send_response(200)
                 self.send_header("Content-Type", "application/epub+zip")
-                self.send_header("Content-Length", str(target.stat().st_size))
+                self.send_header("Content-Length", str(size))
                 self.send_header(
                     "Content-Disposition",
                     f"attachment; filename=emend-{row['id'][:12]}.epub; filename*=UTF-8''{quote(filename, safe='')}",
@@ -496,9 +501,8 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header("Referrer-Policy", "no-referrer")
                 self.end_headers()
-                with target.open("rb") as stream:
-                    while chunk := stream.read(64 * 1024):
-                        self.wfile.write(chunk)
+                while chunk := stream.read(64 * 1024):
+                    self.wfile.write(chunk)
             except (OSError, TimeoutError):
                 self.close_connection = True
 
