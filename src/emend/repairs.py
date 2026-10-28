@@ -5,6 +5,7 @@ import html
 import tempfile
 import uuid
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -13,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from emend import ENGINE_VERSION
 from emend.config import Config
 from emend.inspect import inspect_epub, local_extra_bytes, sha256_file
-from emend.models import Gate, RepairChange, Report
+from emend.models import Gate, Inspection, RepairChange, Report
 from emend.navigation_repair import ACTION as NAV_ACTION
 from emend.navigation_repair import DESCRIPTION as NAV_DESCRIPTION
 from emend.navigation_repair import (
@@ -70,10 +71,110 @@ class RepairPlan(BaseModel):
     findings: list[str]
 
 
+MIMETYPE_ERRORS = {"zip.mimetype_order", "zip.mimetype_header"}
+# A misplaced mimetype entry is rewritten only when every other structural error
+# is one a later step in the same plan can repair. Never try to rehabilitate
+# unreadable, unsafe, or otherwise damaged containers.
+CHAINABLE_ERRORS = MIMETYPE_ERRORS | {"navigation.missing_target"}
+ORDER = (ACTION, NAV_ACTION, XHTML_ACTION)
+DESCRIPTIONS = {ACTION: DESCRIPTION, NAV_ACTION: NAV_DESCRIPTION, XHTML_ACTION: XHTML_DESCRIPTION}
+
+
 def proposed_actions(inspection) -> list[str]:
     errors = {f.code for f in inspection.findings if f.severity == "error"}
-    # Never try to rehabilitate unreadable, unsafe, or otherwise damaged containers.
-    return [ACTION] if errors and errors <= {"zip.mimetype_order", "zip.mimetype_header"} else []
+    return [ACTION] if errors & MIMETYPE_ERRORS and errors <= CHAINABLE_ERRORS else []
+
+
+@dataclass
+class Step:
+    """One simulated repair: its input, output and the inspection it was planned from."""
+
+    action: str
+    source: Path
+    target: Path
+    inspection: Inspection
+    edits: list
+
+
+def discover(action, source, inspection) -> list:
+    if action == ACTION:
+        return proposed_actions(inspection)
+    if action == NAV_ACTION:
+        return discover_links(source, inspection)
+    return discover_markup(source, inspection)
+
+
+def rewrite(action, source, target, inspection, edits):
+    if action == ACTION:
+        rewrite_container(source, target)
+    elif action == NAV_ACTION:
+        rewrite_navigation(source, target, inspection, edits)
+    else:
+        rewrite_markup(source, target, inspection, edits)
+
+
+def simulate(current: Path, staging: Path, limits):
+    """Apply each supported repair in order to staging copies; the book is not changed.
+
+    Each step is discovered on the previous step's output, so a packaging repair can
+    expose contents-link or markup problems that inspection could not reach before.
+    A chain whose final copy is still structurally unreadable proposes nothing.
+    """
+    baseline = inspect_epub(current, limits)
+    source, inspection, steps = current, baseline, []
+    for action in ORDER:
+        edits = discover(action, source, inspection)
+        if not edits:
+            continue
+        target = staging / f"step-{len(steps) + 1}.epub"
+        try:
+            rewrite(action, source, target, inspection, edits)
+        except ValueError:
+            break
+        steps.append(Step(action, source, target, inspection, [] if action == ACTION else edits))
+        source, inspection = target, inspect_epub(target, limits)
+    if inspection.blocking:
+        return baseline, []
+    return baseline, steps
+
+
+def planned_edits(plan, action) -> list:
+    return [ACTION] if action == ACTION else plan.links if action == NAV_ACTION else plan.markup
+
+
+def replay(plan, current: Path, baseline, staging: Path, limits):
+    """Repeat exactly the planned steps; any divergence from the plan is a rejection."""
+    source, inspection, steps = current, baseline, []
+    for action in plan.actions:
+        edits = discover(action, source, inspection)
+        if edits != planned_edits(plan, action):
+            raise ValueError("Current EPUB no longer matches the proposed repair.")
+        target = staging / f"step-{len(steps) + 1}.epub"
+        rewrite(action, source, target, inspection, edits)
+        steps.append(Step(action, source, target, inspection, [] if action == ACTION else edits))
+        source, inspection = target, inspect_epub(target, limits)
+    return steps, source, inspection
+
+
+def step_preserved(step, limits) -> bool:
+    """Each step is checked by the comparison written for that repair alone."""
+    if step.action == ACTION:
+        after = inspect_epub(step.target, limits)
+        return (
+            container_preserved(step.source, step.target)
+            and after.resource_hashes == step.inspection.resource_hashes
+        )
+    if step.action == NAV_ACTION:
+        return navigation_preserved(step.source, step.target, step.inspection, step.edits)
+    return markup_preserved(step.source, step.target, step.inspection, step.edits)
+
+
+def plan_detail(actions) -> str:
+    if len(actions) == 1:
+        return DESCRIPTIONS[actions[0]]
+    return " ".join(
+        f"Step {number}: {DESCRIPTIONS[action]}" for number, action in enumerate(actions, 1)
+    )
 
 
 def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
@@ -83,16 +184,12 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
         with tempfile.TemporaryDirectory(dir=config.root / ".staging") as staging:
             current = Path(staging) / "current.epub"
             snapshot(source, current, config.limits.max_archive_mb * 1024**2)
-            inspection = inspect_epub(current, config.limits)
+            inspection, steps = simulate(current, Path(staging), config.limits)
             if inspection.source_sha256 != digest or sha256_file(source) != digest:
                 raise ValueError("Current EPUB changed while preparing repairs.")
-            actions = proposed_actions(inspection)
-            links = discover_links(current, inspection) if not actions else []
-            if links:
-                actions = [NAV_ACTION]
-            markup = discover_markup(current, inspection) if not actions else []
-            if markup:
-                actions = [XHTML_ACTION]
+            actions = [step.action for step in steps]
+            links = next((s.edits for s in steps if s.action == NAV_ACTION), [])
+            markup = next((s.edits for s in steps if s.action == XHTML_ACTION), [])
             before = None
             if ACTION in actions:
                 with zipfile.ZipFile(current) as archive:
@@ -121,7 +218,7 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
                 after=ContainerState(position=1, compression="stored", extra_bytes=0)
                 if ACTION in actions
                 else None,
-                detail=XHTML_DESCRIPTION if markup else NAV_DESCRIPTION if links else DESCRIPTION,
+                detail=plan_detail(actions) if actions else DESCRIPTION,
                 findings=[f"{f.code}: {f.message}"[:2000] for f in inspection.findings[:200]],
             )
         directory = config.root / "repairs" / row["id"] / plan.id
@@ -130,7 +227,16 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
         path.write_text(plan.model_dump_json(indent=2))
         esc = html.escape
         action = (
-            f"<p><code>{esc(plan.actions[0])}</code>: {esc(plan.detail)}</p>"
+            "".join(
+                f"<p><code>{esc(name)}</code>: {esc(DESCRIPTIONS[name])}</p>"
+                for name in plan.actions
+            )
+            + (
+                "<p>The steps run in this order, each on the previous step’s output, and are "
+                "checked one by one. Only the final copy is validated and used.</p>"
+                if len(plan.actions) > 1
+                else ""
+            )
             if plan.actions
             else "<p>No supported repair. Other structural errors require manual review.</p>"
         )
@@ -275,43 +381,27 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
             raise ValueError("Stored version hash mismatch.")
         # Snapshot and inspect before permitting any ZIP reads by the rewriter.
         with tempfile.TemporaryDirectory(dir=config.root / ".staging") as staging:
-            current, candidate = Path(staging) / "current.epub", Path(staging) / "candidate.epub"
+            current = Path(staging) / "current.epub"
             snapshot(source, current, config.limits.max_archive_mb * 1024**2)
             baseline = inspect_epub(current, config.limits)
-            actions = proposed_actions(baseline)
-            links = discover_links(current, baseline) if not actions else []
-            if links:
-                actions = [NAV_ACTION]
-            markup = discover_markup(current, baseline) if not actions else []
-            if markup:
-                actions = [XHTML_ACTION]
+            first = plan.actions[0]
             if (
                 baseline.source_sha256 != digest
-                or actions != plan.actions
-                or links != plan.links
-                or markup != plan.markup
+                or any(discover(a, current, baseline) for a in ORDER[: ORDER.index(first)])
+                or discover(first, current, baseline) != planned_edits(plan, first)
             ):
                 raise ValueError("Current EPUB no longer matches the proposed repair.")
             atomic_copy(current, retained)
             replaced = False
             try:
-                if plan.actions == [ACTION]:
-                    rewrite_container(current, candidate)
-                elif plan.actions == [XHTML_ACTION]:
-                    rewrite_markup(current, candidate, baseline, plan.markup)
-                else:
-                    rewrite_navigation(current, candidate, baseline, plan.links)
-                inspection = inspect_epub(candidate, config.limits)
+                steps, candidate, inspection = replay(
+                    plan, current, baseline, Path(staging), config.limits
+                )
+                # Every step passes its own comparison; the whole chain keeps the
+                # book's metadata, spine and reading text exactly.
                 preserved = (
                     not inspection.blocking
-                    and (
-                        container_preserved(current, candidate)
-                        and inspection.resource_hashes == baseline.resource_hashes
-                        if plan.actions == [ACTION]
-                        else markup_preserved(current, candidate, baseline, plan.markup)
-                        if plan.actions == [XHTML_ACTION]
-                        else navigation_preserved(current, candidate, baseline, plan.links)
-                    )
+                    and all(step_preserved(step, config.limits) for step in steps)
                     and inspection.metadata == baseline.metadata
                     and inspection.spine == baseline.spine
                     and inspection.text_sha256 == baseline.text_sha256
@@ -399,12 +489,15 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
                         ],
                         "repair_changes": [
                             *previous.repair_changes,
-                            RepairChange(
-                                plan_id=plan.id,
-                                action=plan.actions[0],
-                                before_sha256=digest,
-                                after_sha256=inspection.source_sha256,
-                            ),
+                            *[
+                                RepairChange(
+                                    plan_id=plan.id,
+                                    action=step.action,
+                                    before_sha256=sha256_file(step.source),
+                                    after_sha256=sha256_file(step.target),
+                                )
+                                for step in steps
+                            ],
                         ],
                     },
                 )
