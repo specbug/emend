@@ -224,7 +224,7 @@ def repair(run, config, book):
         plan, _ = prepare_repairs(row["id"], config)
         if not plan.actions:
             break
-        name = FIX_NAMES.get(plan.actions[0], "a supported repair")
+        name = " then ".join(f"“{FIX_NAMES.get(a, a)}”" for a in plan.actions)
         try:
             apply_repairs(row["id"], config, plan_id=plan.id, approve=plan.actions)
         except RepairRejectedError:
@@ -232,11 +232,11 @@ def repair(run, config, book):
             run.end(
                 "repair",
                 "failed",
-                f"{done}Tried “{name}”, but the repaired copy still failed its checks, "
+                f"{done}Tried {name}, but the repaired copy still failed its checks, "
                 "so Emend kept the previous version.",
             )
             return
-        applied.append(f"“{name}”")
+        applied.append(name)
     row, _, digest = current_source(store, book, config)
     remaining = blockers(row, get_report(store, row["id"]), digest, config)
     if applied:

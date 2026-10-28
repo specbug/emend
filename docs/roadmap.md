@@ -25,6 +25,10 @@ the validator's messages, what was tried and the next steps. Spacing refinement
 compares baseline and adjusted pages before an explicit apply and can return to the
 baseline. No new repair kinds, editing operations or input formats were added.
 
+Version 0.22 lets supported repairs combine: one plan chains packaging, contents-link
+and markup repairs, each checked independently, with only the final copy validated and
+activated. No new kinds of repair were added.
+
 ## Implemented workflow
 
 - **Preserve and inspect.** Originals retain their exact bytes and identity hashes.

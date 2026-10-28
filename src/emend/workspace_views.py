@@ -479,7 +479,9 @@ class BookView:
             messages, _ = epubcheck_messages(candidate, root)
         except (ValueError, OSError):
             return None
-        return FIX_NAMES.get(candidate.repair_changes[-1].action, "A supported repair"), messages
+        plan = candidate.repair_changes[-1].plan_id
+        steps = [c.action for c in candidate.repair_changes if c.plan_id == plan]
+        return " then ".join(f"“{FIX_NAMES.get(a, a)}”" for a in steps), messages
 
     def repair_attempted(self):
         plan = self.latest("repairs")
@@ -885,7 +887,7 @@ class BookView:
         if "structure" in names:
             if self.rejected and self.rejected[1]:
                 return (
-                    f"“{self.rejected[0]}” worked, but the repaired copy still has "
+                    f"{self.rejected[0]} worked, but the repaired copy still has "
                     f"{plural(len(self.rejected[1]), 'EPUBCheck error')}."
                 )
             count = len(
@@ -916,7 +918,7 @@ class BookView:
             return f"Emend applied {names}. The problems below have no supported repair."
         if self.rejected and self.rejected[1]:
             return (
-                f"Emend applied “{self.rejected[0]}” to a copy, then EPUBCheck found the errors "
+                f"Emend applied {self.rejected[0]} to a copy, then EPUBCheck found the errors "
                 "below in that copy, so it kept the previous version. Once they are fixed, the "
                 "repair applies on the next run."
             )

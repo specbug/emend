@@ -57,7 +57,9 @@ Keep reader compatibility claims tied to actual device evidence.
 - Missing-cover creation deliberately adds a first spine page; preserve all original resource bytes and their relative order, and carry `cover_additions` through later edits. Refuse existing cover-page hints and fixed-layout books.
 - `repairs.py`, `navigation_repair.py`, `xhtml_repair.py`: explicit packaging/navigation/markup repair plans,
   independent payload/XML preservation, validator gates, and retained revisions. Carry `repair_changes` through later
-  edits; never apply repairs while preparing a plan. Navigation repair must change
+  edits; preparing a plan may simulate its steps only on staging copies and never changes the book.
+  A plan chains supported actions in a fixed order (packaging, links, markup); each step is
+  checked by its own preservation comparison and only the final copy is validated and activated. Navigation repair must change
   only the approved attributes and EPUB 3 modification timestamp, with independent
   tree comparison and unchanged reading text/unrelated resource bytes.
   Markup repair fills only empty EPUB 2 root language attributes from one package

@@ -385,3 +385,23 @@ the shelf, running, ready, blocked, rejected-repair, comparison and applied stat
 no horizontal overflow was found and the screens were inspected visually. Official
 EPUBCheck, Ace and Calibre were not run for this change; fixture validators were
 used. No personal books, Drive account or reader hardware were involved.
+
+## Combined repairs (0.22)
+
+Repair plans now chain the existing supported actions instead of offering one at a
+time. Synthetic fixtures cover packaging + markup, packaging + contents links,
+contents links + markup, and all three together. Each was applied with the fixture
+validator and with official EPUBCheck 5.3.0 (checksum-verified JAR), and the official
+validator accepted every repaired copy. The tests assert:
+- the original keeps its hash;
+- preparing a plan leaves the book and report unchanged;
+- one `repair_changes` entry per step forms an unbroken hash chain to the activated copy;
+- metadata, spine and reading text are identical;
+- only the files each step may touch differ;
+- retrying is idempotent.
+
+A plan must be approved in full. A failed preservation check on any step rejects the
+whole chain and leaves the book unchanged. A packaging fault next to an unrepairable
+contents link is not offered. The existing container, navigation and markup safety
+cases, including rejection evidence for an unreadable candidate, still pass. Ace,
+Calibre and rclone integrations were not run locally for this change.
