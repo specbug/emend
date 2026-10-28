@@ -627,3 +627,26 @@ def test_rtl_comparison_uses_scrolling_without_changing_reading_order(tmp_path, 
     trial = image_conversion_trial(before.book_id, config, layout="scroll")
     after = apply_image_conversion(before.book_id, config, trial_id=trial.id, approve=True)
     assert after.inspection.spine == before.inspection.spine
+
+
+@pytest.mark.parametrize(
+    "fmt,extension,media,warns",
+    [("PNG", ".png", "image/png", True), ("JPEG", ".jpg", "image/jpeg", False)],
+)
+def test_sleep_pixel_advisory_is_specific_to_png(tmp_path, config, fmt, extension, media, warns):
+    image = Image.new("RGB", (1700, 1900), "#456789")
+    out = io.BytesIO()
+    image.save(out, fmt)
+    files = book_files()
+    files.pop("EPUB/observatory.png")
+    files["EPUB/cover" + extension] = out.getvalue()
+    files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
+        b'href="observatory.png" media-type="image/png"',
+        f'href="cover{extension}" media-type="{media}" properties="cover-image"'.encode(),
+    )
+    files["EPUB/chapter.xhtml"] = files["EPUB/chapter.xhtml"].replace(
+        b"observatory.png", f"cover{extension}".encode()
+    )
+    path = write_epub(tmp_path / "limit.epub", files)
+    notes = reader_notes(path, inspect_epub(path, config.limits))
+    assert any("source limits" in n for n in notes) == warns

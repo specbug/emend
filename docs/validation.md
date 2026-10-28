@@ -9,7 +9,7 @@ percent-encoded references, manifest cover/fallback IDs, collisions, bounds,
 animation/vector/corrupt-image skips, unsafe-reference refusal, independent
 preservation, stale/tampered comparisons, validator/activation rollback, and
 conversion history through text-size, metadata, revalidation and recovery. The
-final focused image/recovery/guidance/text-size/UI run passes 149 cases. Local
+final focused image/recovery/guidance/text-size/UI run passes 151 cases. Local
 full-suite runs report five opt-in Ace skips separately; hosted CI runs Ace.
 
 A generated 327-WebP, 35-spine-document book completed the actual workspace flow:

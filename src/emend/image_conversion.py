@@ -420,7 +420,7 @@ def discover(source, inspection):
                     image.width * image.height > 8388608
                     or image.width > 2048
                     or image.height > 3072
-                    or image.width * image.height > 2048 * 1536
+                    or (extension == ".png" and image.width * image.height > 2048 * 1536)
                 ):
                     plan.notes.append(
                         f"{href}: dimensions stay {image.width} × {image.height}; above one or more CrossPoint source limits. No resizing is done."
