@@ -405,3 +405,26 @@ whole chain and leaves the book unchanged. A packaging fault next to an unrepair
 contents link is not offered. The existing container, navigation and markup safety
 cases, including rejection evidence for an unreadable candidate, still pass. Ace,
 Calibre and rclone integrations were not run locally for this change.
+
+## Text size on the reader (0.23)
+
+CrossPoint 2.0.0-rc behaviour was established by reading its pinned source: the CSS
+parser, the property list and the user guide (sources in
+[CrossPoint typography](crosspoint-typography.md)). It was not tested on X4 Pro hardware.
+
+Synthetic fixtures cover:
+- discovery of `em`, `rem`, `%` and keyword sizes in plain `html`/`body`/`p` rules,
+  including grouped selectors;
+- exclusion of class/descendant, heading, `@media`, absolute and neutral values;
+- root-size chains left alone, and non-UTF-8 stylesheets refused.
+
+An independent check rejects any unplanned byte: another declaration, a comment, a
+heading size, trailing whitespace, or a dropped `!important`.
+
+On EPUB 2 and EPUB 3, a compared reset changed only the planned values, plus the
+EPUB 3 modification timestamp. Reading text, spine and metadata were unchanged.
+Application is idempotent, requires approval and a validated book, rejects a tampered
+candidate with the previous book retained, and keeps its history through revalidation.
+Official EPUBCheck 5.3.0 accepted the reset book. The CLI and workspace flows were
+exercised: detection → comparison → apply → return to baseline. Chromium screenshots
+at 1280 and 390 px showed no horizontal overflow.

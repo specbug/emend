@@ -373,3 +373,39 @@ def restore(run, config, book, revision, expected_report):
     run.end("restore", "done", check_summary(report, config))
     preview(run, config, book)
     run.notice = "Restored the earlier version and checked it again."
+
+
+def size_trial(run, config, book, layout):
+    from emend.text_size import text_size_trial
+
+    run.begin("trial")
+    try:
+        trial = text_size_trial(book, config, max_documents=PREVIEW_DOCUMENTS, layout=layout)
+    except ValueError as exc:
+        if layout != "paginated" or "layout scroll" not in str(exc):
+            raise
+        trial = text_size_trial(book, config, max_documents=PREVIEW_DOCUMENTS, layout="scroll")
+    if trial.status == "complete":
+        run.end("trial", "done", "Rendered the book as published and at your reader's size.")
+        run.notice = "Comparison ready. Nothing in the book has changed yet."
+    else:
+        run.end("trial", "failed", "Some pages could not be rendered, so it cannot be applied.")
+
+
+def apply_size(run, config, book, trial_id):
+    from emend.text_size import apply_text_size
+
+    run.begin("apply")
+    report = apply_text_size(book, config, trial_id=trial_id, approve=True)
+    change = report.text_size_changes[-1]
+    run.end(
+        "apply",
+        "done",
+        f"Reset {plural(change.edits, 'size rule')}, kept every other byte and passed the required checks.",
+    )
+    preview(run, config, book)
+    run.notice = "Body text now follows your reader's size. The comparison is kept below."
+
+
+def plural(count, word):
+    return f"{count} {word if count == 1 else word + 's'}"

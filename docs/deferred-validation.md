@@ -8,6 +8,9 @@ Further validation needs real library/device access or a broader corpus:
 
 - Broaden the automated Ace corpus beyond original EPUB 2/3 fixtures, and perform screen-reader, reading-order, alternative-text quality, footnote, contrast, and resizing reviews. An automated audit alone cannot establish accessibility conformance.
 - Calibrate scrolling and paginated Chromium previews against actual readers, obfuscated fonts, fixed layouts, vertical writing, and interactive footnotes. Paginated mode currently supports only horizontal LTR reflowable content. The generic browser sizes are not device profiles.
+- Confirm on the X4 Pro that a text-size reset makes body text follow **Reader Font Size**, that the book's
+  line height has no effect, and that embedded fonts are ignored. The CrossPoint behaviour in
+  [CrossPoint typography](crosspoint-typography.md) comes from reading the pinned 2.0.0-rc source.
 - Open replaced covers in Calibre on the Mac and on the intended reader. Browser comparison does not certify ebook-reader rendering.
 - Exercise more real-world cover declarations, image reuse, unusual colour profiles, palettes/transparency, translated editions, and multi-author collections. Missing/ambiguous/SVG cover declarations remain unsupported for replacement.
 - Verify a successful live Google Books response when quota permits. HTTP 429 is reported as a provider failure, not corroboration.

@@ -40,6 +40,8 @@ ACTION_STEPS = {
     "typography-trial": "refine",
     "apply-typography": "refine",
     "restore-baseline": "refine",
+    "text-size-trial": "refine",
+    "apply-text-size": "refine",
     **{
         action: "refine"
         for action in (

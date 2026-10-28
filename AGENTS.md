@@ -77,6 +77,11 @@ Keep reader compatibility claims tied to actual device evidence.
   CSS application. Keep `typography_changes` through later edits; verify stylesheet
   declarations independently and preserve all text/unrelated resources. The current/trial
   captures must share one verified snapshot and evidence must remain hash-checked.
+- `text_size.py`: explicit, compared reset of publisher `font-size` values in plain
+  html/body/p rules only, because CrossPoint honours nothing else reliably (see
+  docs/crosspoint-typography.md). Verify untouched CSS bytes and parsed rules
+  independently, keep `text_size_changes` through later edits, and never touch
+  class/id, heading, inline, @media or absolute sizes.
 - `reading_review.py`: bounded offline font/marked-note/direction evidence.
   Keep source observations distinct from glyph coverage, reader behavior and
   accessibility conformance; limits must produce incomplete evidence.

@@ -96,6 +96,14 @@ class TypographyChange(BaseModel):
     after_sha256: str
 
 
+class TextSizeChange(BaseModel):
+    trial_id: str
+    stylesheets: list[str]
+    edits: int
+    before_sha256: str
+    after_sha256: str
+
+
 class CoverAddition(BaseModel):
     review_id: str
     candidate_id: str
@@ -132,6 +140,7 @@ class Report(BaseModel):
     revalidation: bool = False
     repair_changes: list[RepairChange] = Field(default_factory=list)
     typography_changes: list[TypographyChange] = Field(default_factory=list)
+    text_size_changes: list[TextSizeChange] = Field(default_factory=list)
     cover_additions: list[CoverAddition] = Field(default_factory=list)
     recovery_changes: list[RecoveryChange] = Field(default_factory=list)
     changes: list[str] = Field(default_factory=list)
