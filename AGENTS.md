@@ -52,11 +52,15 @@ Keep reader compatibility claims tied to actual device evidence.
 - `inspect.py`, `pipeline.py`, `storage.py`, `models.py`: inspection, preserved
   artifacts, lifecycle state, and saved evidence models.
 - Missing-cover creation deliberately adds a first spine page; preserve all original resource bytes and their relative order, and carry `cover_additions` through later edits. Refuse existing cover-page hints and fixed-layout books.
-- `repairs.py`, `navigation_repair.py`: explicit packaging/navigation repair plans,
+- `repairs.py`, `navigation_repair.py`, `xhtml_repair.py`: explicit packaging/navigation/markup repair plans,
   independent payload/XML preservation, validator gates, and retained revisions. Carry `repair_changes` through later
   edits; never apply repairs while preparing a plan. Navigation repair must change
   only the approved attributes and EPUB 3 modification timestamp, with independent
   tree comparison and unchanged reading text/unrelated resource bytes.
+  Markup repair fills only empty EPUB 2 root language attributes from one package
+  language and converts block-only paragraph wrappers inside body/div. Preserve
+  local language overrides, prose, attributes, IDs and unrelated bytes; compare
+  full XML trees independently. EPUB 3 empty languages are valid and stay intact.
 - `inbox.py`: stable-file batch/foreground ingestion. Always use the atomic
   `ingest_new` path for automation; ordinary `ingest` intentionally resets books.
 - `research/`, `curation.py`, `covers.py`, `cover_apply.py`, `cover_create.py`: discovery, advice,

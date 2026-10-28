@@ -28,6 +28,9 @@ from emend.research.discovery import current_source
 from emend.revalidation import snapshot
 from emend.storage import Store, now
 from emend.validation import validate_ace, validate_epubcheck
+from emend.xhtml_repair import ACTION as XHTML_ACTION
+from emend.xhtml_repair import DESCRIPTION as XHTML_DESCRIPTION
+from emend.xhtml_repair import MarkupRepair, discover_markup, markup_preserved, rewrite_markup
 
 ACTION = "container.mimetype"
 DESCRIPTION = (
@@ -58,8 +61,9 @@ class RepairPlan(BaseModel):
     engine_version: str
     policy_sha256: str
     created_at: str
-    actions: list[Literal["container.mimetype", "navigation.case_paths"]]
+    actions: list[Literal["container.mimetype", "navigation.case_paths", "xhtml.markup"]]
     links: list[LinkRepair] = Field(default_factory=list)
+    markup: list[MarkupRepair] = Field(default_factory=list)
     before: ContainerState | None = None
     after: ContainerState | None = None
     detail: str
@@ -86,6 +90,9 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
             links = discover_links(current, inspection) if not actions else []
             if links:
                 actions = [NAV_ACTION]
+            markup = discover_markup(current, inspection) if not actions else []
+            if markup:
+                actions = [XHTML_ACTION]
             before = None
             if ACTION in actions:
                 with zipfile.ZipFile(current) as archive:
@@ -109,11 +116,12 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
                 created_at=now(),
                 actions=actions,
                 links=links,
+                markup=markup,
                 before=before,
                 after=ContainerState(position=1, compression="stored", extra_bytes=0)
                 if ACTION in actions
                 else None,
-                detail=NAV_DESCRIPTION if links else DESCRIPTION,
+                detail=XHTML_DESCRIPTION if markup else NAV_DESCRIPTION if links else DESCRIPTION,
                 findings=[f"{f.code}: {f.message}"[:2000] for f in inspection.findings[:200]],
             )
         directory = config.root / "repairs" / row["id"] / plan.id
@@ -146,6 +154,21 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
                 )
                 + "</ul>"
             )
+        if plan.markup:
+            action += (
+                "<h2>Proposed HTML changes</h2><ul>"
+                + "".join(
+                    f"<li><strong>{esc(edit.document)}</strong>, element {edit.element}: "
+                    + (
+                        f"set empty <code>{esc(edit.attribute)}</code> to <code>{esc(edit.after)}</code>"
+                        if edit.kind == "language"
+                        else "replace block-only <code>p</code> wrapper with <code>div</code>"
+                    )
+                    + ".</li>"
+                    for edit in plan.markup
+                )
+                + "</ul>"
+            )
         findings = "".join(f"<li>{esc(f)}</li>" for f in plan.findings)
         (directory / "review.html").write_text(
             '<!doctype html><html lang="en"><head><meta charset="utf-8">'
@@ -155,8 +178,9 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
             f"<h1>EPUB repair</h1><p><code>{esc(row['source_name'])}</code></p>"
             f"<p>Input SHA-256: <code>{digest}</code></p>{action}"
             "<p>This proposal has not changed the EPUB or its approval state. Applying requires "
-            "explicit approval and fresh validation. Typography and reading content stay intact; "
-            "this does not certify publication quality or device compatibility.</p>"
+            "explicit approval and fresh validation. Reading text stays unchanged. Stylesheets "
+            "are not rewritten; preview affected pages after markup repairs. "
+            "This does not certify publication quality or device compatibility.</p>"
             f"<h2>Inspection findings</h2><p>First 200 findings, up to 2,000 characters each. Full findings remain in the quality report.</p><ul>{findings}</ul></main></body></html>"
         )
         store.save_document(plan.id, row["id"], "repairs", path, sha256_file(path))
@@ -258,13 +282,23 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
             links = discover_links(current, baseline) if not actions else []
             if links:
                 actions = [NAV_ACTION]
-            if baseline.source_sha256 != digest or actions != plan.actions or links != plan.links:
+            markup = discover_markup(current, baseline) if not actions else []
+            if markup:
+                actions = [XHTML_ACTION]
+            if (
+                baseline.source_sha256 != digest
+                or actions != plan.actions
+                or links != plan.links
+                or markup != plan.markup
+            ):
                 raise ValueError("Current EPUB no longer matches the proposed repair.")
             atomic_copy(current, retained)
             replaced = False
             try:
                 if plan.actions == [ACTION]:
                     rewrite_container(current, candidate)
+                elif plan.actions == [XHTML_ACTION]:
+                    rewrite_markup(current, candidate, baseline, plan.markup)
                 else:
                     rewrite_navigation(current, candidate, baseline, plan.links)
                 inspection = inspect_epub(candidate, config.limits)
@@ -274,6 +308,8 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
                         container_preserved(current, candidate)
                         and inspection.resource_hashes == baseline.resource_hashes
                         if plan.actions == [ACTION]
+                        else markup_preserved(current, candidate, baseline, plan.markup)
+                        if plan.actions == [XHTML_ACTION]
                         else navigation_preserved(current, candidate, baseline, plan.links)
                     )
                     and inspection.metadata == baseline.metadata
@@ -292,7 +328,7 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
                         name="preservation",
                         status="passed" if preserved else "failed",
                         required=True,
-                        detail="Unrelated resource bytes, reading text, metadata and spine must match; only approved packaging or navigation attributes and the EPUB 3 modification timestamp may change.",
+                        detail="Unrelated resource bytes, reading text, metadata and spine must match; only approved packaging, navigation or HTML markup edits and the EPUB 3 modification timestamp may change.",
                     ),
                 ]
                 if preserved and not inspection.blocking:
@@ -354,6 +390,11 @@ def apply_repairs(book_id: str, config: Config, *, plan_id: str, approve: list[s
                             *[
                                 f"{link.document} {link.attribute}: {link.before} → {link.after}. Plan: {plan.id}"
                                 for link in plan.links
+                            ],
+                            *[
+                                f"{edit.document} element {edit.element}: "
+                                f"{edit.attribute or edit.kind} {edit.before!r} → {edit.after!r}. Plan: {plan.id}"
+                                for edit in plan.markup
                             ],
                         ],
                         "repair_changes": [

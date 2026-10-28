@@ -494,9 +494,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,su
                     "own copy; “Run checks again” does not reload edits from Calibre.</p>"
                     '<p><a href="https://github.com/specbug/emend/blob/main/docs/epubcheck-troubleshooting.md" '
                     'target="_blank" rel="noopener noreferrer">How to inspect these errors</a>. '
-                    "Emend currently fixes EPUB packaging and certain broken contents "
-                    "links. It cannot repair every validator or accessibility error.</p>"
+                    "Emend supports packaging, selected contents links, empty root language "
+                    "attributes and block-only paragraph wrappers. Other errors still need "
+                    "manual editing.</p>"
                 )
+                body += form("repair-plan", "Find available fixes")
+                body += '<p class="quiet">Run a fresh scan after updating Emend to check for newly supported fixes.</p>'
         elif problems and not missing_tool:
             body += form("repair-plan", "Find available fixes")
             body += '<p class="quiet">Looks for supported fixes without changing the book. You choose whether to apply them.</p>'

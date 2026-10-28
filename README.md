@@ -73,7 +73,7 @@ Known books open without resetting their curated edits. Each book follows three 
 
 1. **Check & fix:** see the actual validator errors and available supported fixes.
    Use **Find available fixes**, then explicitly apply a named repair such as
-   **Fix EPUB packaging**. An empty repair scan explains that manual editing is
+   **Fix EPUB packaging** or **Fix HTML markup**. An empty repair scan explains that manual editing is
    needed; it never claims the book was fixed. Missing checkers have setup guidance.
 2. **Preview:** inspect page samples. Optional sections contain spacing comparisons,
    font/footnote checks, edition research and cover changes. Spacing presets only
@@ -226,7 +226,33 @@ uv run emend repair-plan BOOK_ID --json
 uv run emend apply-repairs BOOK_ID --plan PLAN_ID --approve container.mimetype
 ```
 
-The plan records the current EPUB/report hashes, quality policy, and inspection findings. It shows current/proposed packaging details for container repairs, or each old/new link and its existing target for navigation repairs. Preparing it changes neither book bytes nor approval. Plans live under `~/Emend/repairs/BOOK_ID/PLAN_ID/`; a changed book, report, policy, or engine requires a new plan. `--approve` is mandatory, and `--plan` selects the exact saved proposal.
+The plan records the current EPUB/report hashes, quality policy, and inspection findings. It shows current/proposed packaging details for container repairs, each old/new link and its existing target for navigation repairs, or each affected file/element for HTML repairs. Preparing it changes neither book bytes nor approval. Plans live under `~/Emend/repairs/BOOK_ID/PLAN_ID/`; a changed book, report, policy, or engine requires a new plan. `--approve` is mandatory, and `--plan` selects the exact saved proposal.
+
+**Fix HTML markup** supports two narrowly scoped repairs in structurally readable books:
+
+- For EPUB 2, fill existing empty root `lang`/`xml:lang` attributes from one
+  unambiguous package language. Nonempty document languages, local overrides and
+  missing attributes stay unchanged. EPUB 3 permits empty language values, so
+  those are preserved.
+- For EPUB 2/3, replace a paragraph wrapper directly inside `body`/`div` with a
+  `div` when it contains only headings/lists and whitespace. Mixed prose, inline
+  parents and other block types remain for manual review. IDs, classes, links and
+  other attributes are retained; stylesheets are not changed. Element-specific
+  CSS can render the repaired wrapper differently, so preview the affected pages.
+
+Use **Find available fixes → Fix HTML markup** in the review workspace, or:
+
+```sh
+uv run emend repair-plan BOOK_ID
+uv run emend apply-repairs BOOK_ID --plan PLAN_ID --approve xhtml.markup
+```
+
+The entire candidate must pass required checks before activation; unsupported
+remaining errors reject the candidate and retain the previous book. Discovery
+limits (1,000 XHTML files, 8 MiB per file, 50,000 elements per file, 500 edits)
+refuse a partial proposal. Unrelated resources remain byte-identical; independent
+XML comparison permits only reviewed attributes/wrappers and, for EPUB 3, the
+modification timestamp. This is not a general HTML or language-detection engine.
 
 The `container.mimetype` action moves the existing `mimetype` entry first, stores it uncompressed, and removes its ZIP extra fields. **Every resource payload stays byte-identical**, including OPF metadata, XHTML, CSS, images, fonts, unmanifested files, and directory records. Other entries retain their relative order, compression, timestamps, extra fields, and comments; the archive comment is retained. ZIP compression/header bytes may differ, so the repaired EPUB has a new hash. Original bytes and pre/post repair revisions are retained.
 
