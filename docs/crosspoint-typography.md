@@ -82,10 +82,13 @@ candidate and baseline/converted page comparison. **Apply image conversion** is
 separate, explicit and runs EPUBCheck (required for this edit) and configured
 accessibility gates before activation. Nothing is converted during import.
 
-PNG is chosen for lossless/unknown-losslessness sources, alpha, palettes and
-images with at most 256 decoded colours or low colour entropy (< 5 bits). Lossy photographic sources become
-baseline JPEG at quality **98**, with no chroma subsampling and **PSNR ≥ 40 dB**
-against decoded source RGB pixels (or exact equality). PNG RGBA pixels must match
+PNG is chosen for lossless/unknown-losslessness sources, real transparency, palettes and
+images with at most 256 decoded colours or low colour entropy (< 5 bits). A fully
+opaque alpha channel is not transparency. Lossy photographic sources become baseline
+JPEG at the first setting of a fixed ladder (quality 85 and 90 with 4:2:0 chroma
+subsampling, then 90, 95 and 98 without) that keeps **PSNR ≥ 40 dB** against decoded
+source RGB pixels (or exact equality). The chosen setting is recorded and replayed
+when the reviewed comparison is applied. PNG RGBA pixels must match
 exactly. All images retain dimensions and ICC profiles; colour images are never
 converted to grayscale. A profile/mode requiring a separate colour conversion is
 left for review. This keeps the same EPUB useful on the iPad too.
@@ -104,10 +107,13 @@ are skipped and listed. Fixed layouts, scripts, malformed documents, custom base
 unknown reference attributes, embedded style elements referencing converted images,
 and CSS image references outside `url()` refuse the whole plan. A conservative
 local srcset grammar is supported; ambiguous/data source sets remain manual. CSS
-must be UTF-8 compatible so bytes outside changed URL tokens remain exact.
+must be UTF-8 compatible so bytes outside changed URL tokens remain exact. A stylesheet
+in another encoding stays byte-identical, unless its bytes name a converted image;
+that refuses the plan. Remote manifest images are skipped.
 
-Limits: 1,000 manifest images, 20 MiB/40 MP per image, 256 MP across converted
-sources, 8 MiB per reference document (CSS 2 MiB), 20,000 grouped references and
+Limits: 1,000 images needing conversion, 20 MiB/40 MP per image, 1,000 MP across
+converted sources per comparison (images beyond it are left for a later pass:
+apply, then compare again), 8 MiB per reference document (CSS 2 MiB), 20,000 grouped references and
 16 MiB of plan JSON. No decompression-bomb protection is disabled. The summary
 reports output formats, skipped images, unchanged oversize dimensions and actual
 book byte-size change. Pixel/validator/browser checks do not certify either device.

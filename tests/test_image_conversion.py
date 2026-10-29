@@ -650,3 +650,137 @@ def test_sleep_pixel_advisory_is_specific_to_png(tmp_path, config, fmt, extensio
     path = write_epub(tmp_path / "limit.epub", files)
     notes = reader_notes(path, inspect_epub(path, config.limits))
     assert any("source limits" in n for n in notes) == warns
+
+
+def photo(alpha=None):
+    """A smooth lossy WebP photo; alpha 255 is fully opaque, a tuple makes a real mask."""
+    rng = random.Random(3)
+    image = Image.new("RGB", (160, 240))
+    image.putdata(
+        [
+            (x + rng.randrange(24), y // 2 + rng.randrange(24), (x + y) // 3)
+            for y in range(240)
+            for x in range(160)
+        ]
+    )
+    if alpha is not None:
+        image.putalpha(
+            alpha if isinstance(alpha, int) else Image.linear_gradient("L").resize(image.size)
+        )
+    out = io.BytesIO()
+    image.save(out, "WEBP", quality=80)
+    return out.getvalue()
+
+
+def photo_book(tmp_path, config, alpha=None, name="photo.epub"):
+    files = files_with()
+    files["EPUB/images/scene one.webp"] = photo(alpha)
+    path = write_epub(tmp_path / name, files)
+    return path, inspect_epub(path, config.limits)
+
+
+def test_jpeg_uses_the_lowest_ladder_setting_that_meets_the_floor(tmp_path, config):
+    from emend.image_conversion import JPEG_LADDER, encode
+
+    path, inspection = photo_book(tmp_path, config)
+    plan = discover(path, inspection)
+    image = plan.images[0]
+    setting = (image.jpeg_quality, image.jpeg_subsampling)
+    assert image.new_media_type == "image/jpeg" and setting in JPEG_LADDER
+    assert setting != JPEG_LADDER[-1] and image.psnr >= 40
+    with zipfile.ZipFile(path) as archive:
+        data = archive.read(image.old_path)
+    # Every cheaper setting misses the floor; replaying the chosen one is deterministic.
+    for cheaper in JPEG_LADDER[: JPEG_LADDER.index(setting)]:
+        with pytest.raises(ValueError, match="fidelity"):
+            encode(data, cheaper)
+    result, *_ = encode(data, setting)
+    assert len(result) == image.new_byte_size < len(encode(data, JPEG_LADDER[-1])[0])
+    target = tmp_path / "converted.epub"
+    rewrite(path, target, inspection, plan)
+    assert preserved(path, target, inspection, plan)
+
+
+@pytest.mark.parametrize("alpha", [255, "mask"])
+def test_fully_opaque_alpha_is_not_kept_as_transparency(tmp_path, config, alpha):
+    path, inspection = photo_book(tmp_path, config, alpha)
+    plan = discover(path, inspection)
+    image = plan.images[0]
+    if alpha == 255:
+        assert image.new_media_type == "image/jpeg" and not image.alpha
+        assert image.reason == "lossy photographic source"
+    else:
+        assert image.new_media_type == "image/png" and image.alpha and image.reason == "alpha"
+    target = tmp_path / "converted.epub"
+    rewrite(path, target, inspection, plan)
+    assert preserved(path, target, inspection, plan)
+
+
+def test_images_over_the_run_limit_are_left_for_a_later_pass(tmp_path, config, monkeypatch):
+    files = files_with()
+    files["EPUB/second.webp"] = webp()
+    files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
+        b"</manifest>", b'<item id="second" href="second.webp" media-type="image/webp"/></manifest>'
+    )
+    path = write_epub(tmp_path / "two.epub", files)
+    monkeypatch.setattr("emend.image_conversion.MAX_TOTAL_PIXELS", 64 * 96)
+    inspection = inspect_epub(path, config.limits)
+    plan = discover(path, inspection)
+    assert [i.manifest_id for i in plan.images] == ["image"]
+    assert [s.manifest_id for s in plan.skipped] == ["second"]
+    assert "compare again to convert the rest" in plan.skipped[0].reason
+    first = tmp_path / "first.epub"
+    rewrite(path, first, inspection, plan)
+    later = discover(first, inspect_epub(first, config.limits))
+    assert [i.manifest_id for i in later.images] == ["second"] and not later.skipped
+
+
+def test_only_images_needing_conversion_count_toward_the_image_limit(tmp_path, config, monkeypatch):
+    files = files_with()
+    files["EPUB/kept.png"] = book_files()["EPUB/observatory.png"]
+    files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
+        b"</manifest>", b'<item id="kept" href="kept.png" media-type="image/png"/></manifest>'
+    )
+    path = write_epub(tmp_path / "mixed.epub", files)
+    monkeypatch.setattr("emend.image_conversion.MAX_IMAGES", 1)
+    plan = discover(path, inspect_epub(path, config.limits))
+    assert [i.manifest_id for i in plan.images] == ["image"]
+
+
+@pytest.mark.parametrize("names_image", [False, True])
+def test_legacy_encoded_stylesheet_refuses_only_when_it_may_name_an_image(
+    tmp_path, config, names_image
+):
+    files = files_with()
+    files["EPUB/legacy.css"] = b"q { quotes: '\xab' '\xbb' }" + (
+        b" div { background: url(images/scene%20one.webp) }" if names_image else b""
+    )
+    files["EPUB/package.opf"] = files["EPUB/package.opf"].replace(
+        b"</manifest>", b'<item id="legacy" href="legacy.css" media-type="text/css"/></manifest>'
+    )
+    path = write_epub(tmp_path / "legacy.epub", files)
+    inspection = inspect_epub(path, config.limits)
+    if names_image:
+        with pytest.raises(ValueError, match="not UTF-8"):
+            discover(path, inspection)
+        return
+    plan = discover(path, inspection)
+    target = tmp_path / "converted.epub"
+    rewrite(path, target, inspection, plan)
+    assert preserved(path, target, inspection, plan)
+    with zipfile.ZipFile(path) as old, zipfile.ZipFile(target) as new:
+        assert old.read("EPUB/legacy.css") == new.read("EPUB/legacy.css")
+
+
+def test_workspace_groups_skipped_images_by_reason():
+    from emend.models import SkippedImage
+    from emend.workspace_views import skipped_images
+
+    skipped = [
+        SkippedImage(manifest_id=f"i{n}", href=f"{n}.webp", reason="Later") for n in range(5)
+    ]
+    skipped.append(SkippedImage(manifest_id="v", href="art.svg", reason="Vector"))
+    assert list(skipped_images(skipped)) == [
+        "<li>Skipped 0.webp, 1.webp, 2.webp and 2 more: Later</li>",
+        "<li>Skipped art.svg: Vector</li>",
+    ]

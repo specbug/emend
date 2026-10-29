@@ -36,11 +36,12 @@ SUPPORTED = {".jpg", ".jpeg", ".png", ".gif"}
 MEDIA = {"image/jpeg", "image/png", "image/gif"}
 MAX_BYTES = 20 * 1024**2
 MAX_PIXELS = 40_000_000
-MAX_TOTAL_PIXELS = 256_000_000
+MAX_TOTAL_PIXELS = 1_000_000_000
 MAX_IMAGES = 1000
 MAX_REFS = 20000
 MAX_DOCUMENT = 8 * 1024**2
-JPEG_QUALITY = 98
+# Lowest setting first; each JPEG uses the first one that meets the PSNR floor.
+JPEG_LADDER = ((85, 2), (90, 2), (90, 0), (95, 0), (98, 0))
 JPEG_PSNR_FLOOR = 40.0
 
 
@@ -59,6 +60,8 @@ class ImageEdit(ConvertedImage):
     alpha: bool
     lossless: bool | None
     psnr: float | None = None
+    jpeg_quality: int | None = None
+    jpeg_subsampling: int | None = None
     reference_indices: list[int] = Field(default_factory=list)
 
 
@@ -140,9 +143,23 @@ def is_lossless(data, image):
     )
 
 
-def encode(data):
+def fidelity(normalized, data):
+    check = image_data(data)
+    difference = ImageChops.difference(normalized.convert("RGBA"), check.convert("RGBA"))
+    mse = sum(ImageStat.Stat(difference.convert("RGB")).sum2) / (
+        3 * normalized.width * normalized.height
+    )
+    exact = all(difference.getextrema()[i] == (0, 0) for i in range(4))
+    return exact, 10 * math.log10(255**2 / mse) if mse else None
+
+
+def encode(data, setting=None):
+    """Encode one image; setting replays a reviewed JPEG (quality, subsampling) choice."""
     image = image_data(data)
-    alpha = "A" in image.getbands() or "transparency" in image.info
+    # A fully opaque alpha channel carries no transparency; PNG would only add size.
+    alpha = ("A" in image.getbands() or "transparency" in image.info) and image.convert(
+        "RGBA"
+    ).getchannel("A").getextrema() != (255, 255)
     lossless = is_lossless(data, image)
     line_art = (
         image.mode in {"P", "1", "L", "LA"}
@@ -165,24 +182,32 @@ def encode(data):
         if png and image.mode in {"1", "L", "LA"}
         else image.convert("RGBA" if alpha else "RGB")
     )
-    output = io.BytesIO()
     options = {key: image.info[key] for key in ("icc_profile", "exif") if image.info.get(key)}
     if png:
+        output = io.BytesIO()
         normalized.save(output, format="PNG", interlace=0, **options)
+        result, chosen = output.getvalue(), None
+        exact, psnr = fidelity(normalized, result)
+        if not exact:
+            raise ValueError("Encoded image failed its pixel-fidelity bound.")
     else:
-        normalized.save(
-            output, format="JPEG", quality=JPEG_QUALITY, subsampling=0, progressive=False, **options
-        )
-    result = output.getvalue()
-    check = image_data(result)
-    difference = ImageChops.difference(normalized.convert("RGBA"), check.convert("RGBA"))
-    mse = sum(ImageStat.Stat(difference.convert("RGB")).sum2) / (3 * image.width * image.height)
-    psnr = 10 * math.log10(255**2 / mse) if mse else None
-    if (png and any(difference.getextrema()[i] != (0, 0) for i in range(4))) or (
-        not png and psnr is not None and psnr < JPEG_PSNR_FLOOR
-    ):
-        raise ValueError("Encoded image failed its pixel-fidelity bound.")
-    return result, image, alpha, lossless, reason, psnr, ".png" if png else ".jpg"
+        for chosen in [setting] if setting else JPEG_LADDER:
+            output = io.BytesIO()
+            normalized.save(
+                output,
+                format="JPEG",
+                quality=chosen[0],
+                subsampling=chosen[1],
+                progressive=False,
+                **options,
+            )
+            result = output.getvalue()
+            _, psnr = fidelity(normalized, result)
+            if psnr is None or psnr >= JPEG_PSNR_FLOOR:
+                break
+        else:
+            raise ValueError("Encoded image failed its pixel-fidelity bound.")
+    return result, image, alpha, lossless, reason, psnr, ".png" if png else ".jpg", chosen
 
 
 def resolver(document, images):
@@ -235,7 +260,25 @@ def references(archive, inspection, images):
         data = archive.read(info)
         resolve = resolver(name, images)
         if css:
-            text = data.decode("utf-8-sig")
+            try:
+                text = data.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                # An unrelated legacy-encoded stylesheet stays byte-identical; one that may
+                # name a converted image cannot be rewritten safely.
+                lowered = data.lower()
+                if any(
+                    spelling.lower().encode() in lowered
+                    for image in images
+                    for spelling in {
+                        posixpath.basename(image.old_path),
+                        quote(posixpath.basename(image.old_path)),
+                    }
+                ):
+                    raise ValueError(
+                        "A stylesheet that is not UTF-8 names a converted image; "
+                        "the whole conversion is refused."
+                    ) from None
+                continue
             after, _ = css_rewrite(text, resolve)
             if after != text:
                 refs.append(Reference(document=name, kind="css", before=text, after=after))
@@ -349,21 +392,35 @@ def discover(source, inspection):
             raise ValueError("Fixed-layout books are not converted.")
         names = {name.casefold() for name in archive.namelist()}
         pixels = 0
-        items = package.xpath(
-            "opf:manifest/opf:item[starts-with(@media-type, 'image/')]", namespaces=NS
-        )
+
+        def needs_conversion(item):
+            target = local_target(inspection.package_path, item.get("href", ""))
+            return not (
+                target
+                and posixpath.splitext(target[0])[1].lower() in SUPPORTED
+                and item.get("media-type", "") in MEDIA
+            )
+
+        items = [
+            item
+            for item in package.xpath(
+                "opf:manifest/opf:item[starts-with(@media-type, 'image/')]", namespaces=NS
+            )
+            if needs_conversion(item)
+        ]
         if len(items) > MAX_IMAGES:
-            raise ValueError("Manifest exceeds the 1,000-image conversion limit.")
+            raise ValueError("More than 1,000 images need conversion; this exceeds the limit.")
         for item in items:
             href, media, identifier = (
                 item.get("href", ""),
                 item.get("media-type", ""),
                 item.get("id", ""),
             )
-            path = local_target(inspection.package_path, href)[0]
-            if posixpath.splitext(path)[1].lower() in SUPPORTED and media in MEDIA:
-                continue
+            target = local_target(inspection.package_path, href)
+            path = target[0] if target else href
             try:
+                if not target:
+                    raise ValueError("Remote image stays unchanged.")
                 if media == "image/svg+xml" or path.lower().endswith(".svg"):
                     raise ValueError("SVG remains vector; rasterising is outside this conversion.")
                 if archive.getinfo(path).file_size > MAX_BYTES:
@@ -373,8 +430,11 @@ def discover(source, inspection):
                     warnings.simplefilter("error", Image.DecompressionBombWarning)
                     with Image.open(io.BytesIO(data)) as header:
                         if pixels + header.width * header.height > MAX_TOTAL_PIXELS:
-                            raise ValueError("Total converted pixels exceed the 256 MP plan limit.")
-                result, image, alpha, lossless, reason, psnr, extension = encode(data)
+                            raise ValueError(
+                                "Left for a later pass: this conversion already covers 1,000 "
+                                "megapixels. Apply it, then compare again to convert the rest."
+                            )
+                result, image, alpha, lossless, reason, psnr, extension, chosen = encode(data)
                 base = posixpath.splitext(path)[0]
                 new_path, index = base + extension, 1
                 while new_path.casefold() in names:
@@ -412,6 +472,8 @@ def discover(source, inspection):
                         alpha=alpha,
                         lossless=lossless,
                         psnr=psnr,
+                        jpeg_quality=chosen[0] if chosen else None,
+                        jpeg_subsampling=chosen[1] if chosen else None,
                     )
                 )
                 names.add(new_path.casefold())
@@ -466,12 +528,7 @@ def discover(source, inspection):
 
 def rewrite(source, candidate, inspection, plan):
     with zipfile.ZipFile(source) as old, zipfile.ZipFile(candidate, "w") as new:
-        replacements, renamed = {}, {}
-        for image in plan.images:
-            result, *_ = encode(old.read(image.old_path))
-            if hashlib.sha256(result).hexdigest() != image.new_sha256:
-                raise ValueError("Image encoder no longer matches the reviewed candidate.")
-            replacements[image.old_path], renamed[image.old_path] = result, image.new_path
+        replacements, images = {}, {image.old_path: image for image in plan.images}
         trees = {}
         for ref in plan.references:
             if ref.kind == "fallback":
@@ -500,12 +557,20 @@ def rewrite(source, candidate, inspection, plan):
         replacements.update({name: serialize(tree) for name, tree in trees.items()})
         new.comment = old.comment
         for info in old.infolist():
-            copy_entry(
-                new,
-                info,
-                replacements.get(info.filename, old.read(info)),
-                renamed.get(info.filename, info.filename),
+            image = images.get(info.filename)
+            if image is None:
+                copy_entry(new, info, replacements.get(info.filename, old.read(info)))
+                continue
+            # Encode one image at a time so memory stays bounded by the largest image.
+            setting = (
+                (image.jpeg_quality, image.jpeg_subsampling)
+                if image.jpeg_quality is not None
+                else None
             )
+            result, *_ = encode(old.read(info), setting)
+            if hashlib.sha256(result).hexdigest() != image.new_sha256:
+                raise ValueError("Image encoder no longer matches the reviewed candidate.")
+            copy_entry(new, info, result, image.new_path)
 
 
 def preserved(source, candidate, inspection, plan):
