@@ -1,6 +1,5 @@
 """Explicitly add a missing cover while preserving every existing reading resource."""
 
-import copy
 import hashlib
 import posixpath
 import tempfile
@@ -13,6 +12,7 @@ from urllib.parse import quote
 from lxml import etree
 
 from emend import ENGINE_VERSION
+from emend.archive import copy_entry
 from emend.config import Config
 from emend.covers import declared_cover, image_details, load_cover_review, read_image
 from emend.inspect import NS, inspect_epub, local_target, parse_xml, sha256_file
@@ -132,8 +132,9 @@ def rewrite(source, candidate, baseline, spec, data, media_type):
         with zipfile.ZipFile(candidate, "w") as new:
             new.comment = old.comment
             for info in old.infolist():
-                new.writestr(
-                    copy.copy(info),
+                copy_entry(
+                    new,
+                    info,
                     serialize(package)
                     if info.filename == baseline.package_path
                     else old.read(info),

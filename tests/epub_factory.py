@@ -50,7 +50,10 @@ def book_files(version="3.0") -> dict[str, bytes]:
     return files
 
 
-def write_epub(path: Path, files: dict[str, bytes] | None = None, version="3.0") -> Path:
+def write_epub(
+    path: Path, files: dict[str, bytes] | None = None, version="3.0", external_attr=None
+) -> Path:
+    """external_attr=0 records no file attributes, as some EPUB producers do."""
     with zipfile.ZipFile(path, "w") as archive:
         for name, data in (files if files is not None else book_files(version)).items():
             archive.writestr(
@@ -58,4 +61,6 @@ def write_epub(path: Path, files: dict[str, bytes] | None = None, version="3.0")
                 data,
                 compress_type=zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED,
             )
+            if external_attr is not None:
+                archive.getinfo(name).external_attr = external_attr
     return path

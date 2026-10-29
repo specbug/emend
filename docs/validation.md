@@ -1,5 +1,27 @@
 # Validation evidence
 
+## Image conversion on a large private book — 0.24.1
+
+The large private reference book (not committed or named) was converted in a
+disposable library with official EPUBCheck 5.3.0. Two problems found there are fixed:
+
+- Every ZIP entry in that book records zero file attributes. Python's `zipfile`
+  rewrote them on copy, so the independent preservation check rejected every
+  curated edit on such books (repairs, text size, spacing, markup, navigation, cover
+  creation, image conversion), and metadata/cover edits changed the records
+  silently. All entry copies now keep the original attributes; the full suite also
+  passed with every fixture written without attributes.
+- At fixed JPEG quality 98, its 327 WebP images (61 MB) needed two passes because of
+  the 256 MP per-comparison limit and grew the book from 69 MB to 254 MB. With the
+  quality ladder and a 1,000 MP limit, one comparison converts all 327 (26 PNG,
+  301 JPEG; 147 at quality 85, 78 at 90 with 4:2:0, 54 at 90, 22 at 95), every JPEG
+  at PSNR ≥ 40 dB, and the book is 136 MB. The comparison took about two minutes
+  with a 433 MB peak. Apply passed preservation and EPUBCheck; reading text was
+  unchanged, the X4 Pro notes were empty and the cover became a JPEG. A zoomed crop
+  of the lowest-fidelity quality-85 image was indistinguishable from its source.
+
+X4 Pro and iPad rendering of the converted book still need a device check.
+
 ## Explicit image-format conversion — 0.24
 
 Verified with Pillow WebP decoding, official EPUBCheck 5.3.0, Chromium and Calibre

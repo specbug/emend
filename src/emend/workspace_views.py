@@ -403,6 +403,16 @@ def library(app, offset=0, error=None):
 # Book -----------------------------------------------------------------------
 
 
+def skipped_images(skipped):
+    """One line per skip reason, naming up to three images."""
+    groups = {}
+    for image in skipped:
+        groups.setdefault(image.reason, []).append(image.href)
+    for reason, hrefs in groups.items():
+        names = ", ".join(hrefs[:3]) + (f" and {len(hrefs) - 3} more" if len(hrefs) > 3 else "")
+        yield f"<li>Skipped {esc(names)}: {esc(reason)}</li>"
+
+
 class BookView:
     """Everything one book page shows, gathered once from saved state."""
 
@@ -1517,9 +1527,7 @@ class BookView:
             )
             body += (
                 '<ul class="observations">'
-                + "".join(
-                    f"<li>Skipped {esc(s.href)}: {esc(s.reason)}</li>" for s in trial.plan.skipped
-                )
+                + "".join(skipped_images(trial.plan.skipped))
                 + "".join(f"<li>{esc(n)}</li>" for n in trial.plan.notes)
                 + "</ul>"
             )

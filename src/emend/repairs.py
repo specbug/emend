@@ -12,6 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from emend import ENGINE_VERSION
+from emend.archive import copy_entry
 from emend.config import Config
 from emend.inspect import inspect_epub, local_extra_bytes, sha256_file
 from emend.models import Gate, Inspection, RepairChange, Report
@@ -316,10 +317,10 @@ def rewrite_container(source: Path, target: Path):
             raise ValueError("Repair requires an existing, exact EPUB mimetype payload.")
         mime.compress_type = zipfile.ZIP_STORED
         mime.extra = b""
-        new.writestr(mime, old.read("mimetype"))
+        copy_entry(new, mime, old.read("mimetype"))
         for info in old.infolist():
             if info.filename != "mimetype":
-                new.writestr(copy.copy(info), old.read(info))
+                copy_entry(new, info, old.read(info))
 
 
 def container_preserved(source: Path, candidate: Path) -> bool:

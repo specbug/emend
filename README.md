@@ -686,7 +686,10 @@ be approved. Finish interrupted recovery/revalidation before converting images.
 
 Dimensions, ICC profiles, text, chapter order, IDs and publisher styles stay intact.
 Lossless/alpha/palette/line-art images become non-interlaced PNG with exact decoded
-pixels; lossy photos become baseline JPEG (quality 98, no subsampling, PSNR ≥ 40 dB).
+pixels; lossy photos become baseline JPEG at the lowest of a fixed set of qualities
+(85–98) that keeps PSNR ≥ 40 dB. A fully opaque alpha channel is not treated as
+transparency. Each comparison converts up to 1,000 megapixels; any images beyond
+that are listed as left for a later pass (apply, then compare again).
 References and converted manifest href/media types are updated together. Unsupported
 animations/vectors/large or unreadable images are listed as skipped; unsafe reference
 graphs refuse the whole conversion. No resizing, grayscale conversion or SVG

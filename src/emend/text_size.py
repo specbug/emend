@@ -8,7 +8,6 @@ therefore edits only the publisher's own ``font-size`` values in plain ``html``,
 byte is checked independently before the candidate is validated and activated.
 """
 
-import copy
 import html
 import shutil
 import tempfile
@@ -22,6 +21,7 @@ import tinycss2
 from pydantic import BaseModel, ConfigDict, Field
 
 from emend import ENGINE_VERSION
+from emend.archive import copy_entry
 from emend.config import Config
 from emend.inspect import NS, inspect_epub, local_target, parse_xml, sha256_file
 from emend.models import Gate, TextSizeChange
@@ -311,7 +311,7 @@ def rewrite(source: Path, target: Path, inspection, edits: list[SizeEdit]):
             modified[0].text = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             replaced[inspection.package_path] = serialize(package)
         for info in old.infolist():
-            new.writestr(copy.copy(info), replaced.get(info.filename, old.read(info)))
+            copy_entry(new, info, replaced.get(info.filename, old.read(info)))
 
 
 def sheet_preserved(old_bytes: bytes, new_bytes: bytes, edits: list[SizeEdit]) -> bool:

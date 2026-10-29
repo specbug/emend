@@ -10,6 +10,7 @@ from pathlib import Path
 from lxml import etree
 
 from emend import ENGINE_VERSION
+from emend.archive import copy_entry
 from emend.config import Config
 from emend.inspect import NS, inspect_epub, parse_xml, sha256_file
 from emend.models import Gate, MetadataChange, Report
@@ -53,8 +54,8 @@ def edit_metadata(source: Path, target: Path, package: str, proposals: list[Prop
         with zipfile.ZipFile(target, "w") as output:
             output.comment = archive.comment
             for info in archive.infolist():
-                output.writestr(
-                    info, package_bytes if info.filename == package else archive.read(info)
+                copy_entry(
+                    output, info, package_bytes if info.filename == package else archive.read(info)
                 )
     return hashlib.sha256(package_bytes).hexdigest()
 
