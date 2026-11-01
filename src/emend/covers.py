@@ -199,21 +199,37 @@ def store_asset(
     )
 
 
-def checked_cover_url(url: str):
-    if not re.fullmatch(
-        r"https://covers\.openlibrary\.org/b/id/[1-9][0-9]*-L\.jpg\?default=false", url
-    ):
-        raise ValueError("Only recorded Open Library cover-image URLs are supported.")
+# Open Library serves older covers from its archive.org storage; a redirect may only
+# move to that storage, and only for the same cover ID.
+COVER_URLS = (
+    r"https://covers\.openlibrary\.org/b/id/(?P<id>[1-9][0-9]*)-L\.jpg\?default=false",
+    r"https://archive\.org/download/(?P<item>olcovers[0-9]+)/(?P=item)-L\.zip/"
+    r"(?P<id>[1-9][0-9]*)-L\.jpg",
+    r"https://ia[0-9]+\.us\.archive\.org/view_archive\.php\?archive=/[0-9]+/items/"
+    r"(?P<item>olcovers[0-9]+)/(?P=item)-L\.zip&file=(?P<id>[1-9][0-9]*)-L\.jpg",
+)
+
+
+def checked_cover_url(url: str, initial: bool = True) -> str:
+    """Return the cover ID of a recorded Open Library URL or of its storage redirect."""
+    for pattern in COVER_URLS[:1] if initial else COVER_URLS:
+        match = re.fullmatch(pattern, url)
+        if match:
+            return match["id"]
+    raise ValueError("Only recorded Open Library cover-image URLs are supported.")
 
 
 class CoverRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        checked_cover_url(newurl)
+        if checked_cover_url(newurl, initial=False) != checked_cover_url(
+            req.full_url, initial=False
+        ):
+            raise ValueError("Open Library redirected to a different cover.")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def download_cover(url: str, timeout: int) -> bytes:
-    checked_cover_url(url)
+    cover_id = checked_cover_url(url)
     try:
         request = urllib.request.Request(
             url, headers={"User-Agent": "Emend/0.3 cover review", "Accept": "image/jpeg,image/png"}
@@ -221,7 +237,8 @@ def download_cover(url: str, timeout: int) -> bytes:
         with urllib.request.build_opener(CoverRedirect()).open(
             request, timeout=timeout
         ) as response:
-            checked_cover_url(response.geturl())
+            if checked_cover_url(response.geturl(), initial=False) != cover_id:
+                raise ValueError("Open Library redirected to a different cover.")
             data = response.read(MAX_BYTES + 1)
         if len(data) > MAX_BYTES:
             raise ValueError("Cover download exceeds 20 MiB.")

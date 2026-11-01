@@ -226,6 +226,36 @@ def test_cover_redirect_restrictions():
         )
 
 
+def test_open_library_storage_redirects_are_followed_only_for_the_same_cover():
+    start = "https://covers.openlibrary.org/b/id/123-L.jpg?default=false"
+    storage = "https://archive.org/download/olcovers1/olcovers1-L.zip/123-L.jpg"
+    node = (
+        "https://ia800605.us.archive.org/view_archive.php?archive=/8/items/olcovers1/"
+        "olcovers1-L.zip&file=123-L.jpg"
+    )
+    hop = CoverRedirect().redirect_request(
+        urllib.request.Request(start), None, 302, "Found", {}, storage
+    )
+    assert hop.full_url == storage
+    hop = CoverRedirect().redirect_request(hop, None, 302, "Found", {}, node)
+    assert hop.full_url == node
+    for other in (
+        storage.replace("123-L", "124-L"),
+        node.replace("file=123", "file=124"),
+        "https://archive.org/download/olcovers1/olcovers2-L.zip/123-L.jpg",
+        "https://archive.org/download/notcovers/notcovers-L.zip/123-L.jpg",
+    ):
+        with pytest.raises(ValueError):
+            CoverRedirect().redirect_request(
+                urllib.request.Request(start), None, 302, "Found", {}, other
+            )
+    # Research never records storage URLs directly; only the cover service URL starts a download.
+    with pytest.raises(ValueError, match="recorded Open Library"):
+        from emend.covers import checked_cover_url
+
+        checked_cover_url(storage)
+
+
 def test_comparison_escapes_source_note_and_contains_images(tmp_path, config):
     before = cover_book(tmp_path, config)
     review = cover_review(
