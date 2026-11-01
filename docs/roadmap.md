@@ -19,7 +19,7 @@ CrossPoint handoff. These changes expose the existing preservation rules; they
 do not introduce unrestricted automatic repair or device-cache generation.
 
 Version 0.20 adds reviewed repair of empty EPUB 2 root language attributes and
-block-only paragraph wrappers in EPUB 2/3. Independent tree/resource comparison and
+block-only paragraph wrappers in EPUB 2/3; 0.25 adds inline-only EPUB 2 blockquotes. Independent tree/resource comparison and
 required validators still gate activation; arbitrary markup repair remains outside
 this scope.
 

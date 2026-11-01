@@ -75,7 +75,7 @@ The import starts at once and runs by itself; the page follows its progress:
    by the required validators.
 2. **Repair:** when required checks fail, Emend prepares a repair plan and applies
    each supported repair (EPUB packaging, case-only contents links, empty EPUB 2
-   root languages and block-only paragraph wrappers) through the same gated path as
+   root languages, inline-only EPUB 2 blockquotes and block-only paragraph wrappers) through the same gated path as
    `apply-repairs`. Several supported problems are repaired together in one plan. Each candidate is independently compared with the current book
    and must pass the required validators; a rejected candidate leaves the previous
    version in place and the page shows the errors found in that candidate.
@@ -262,6 +262,11 @@ The plan records the current EPUB/report hashes, quality policy, and inspection 
   unambiguous package language. Nonempty document languages, local overrides and
   missing attributes stay unchanged. EPUB 3 permits empty language values, so
   those are preserved.
+- For EPUB 2, wrap the content of a `blockquote` that holds only inline content
+  (text, links, spans) in one plain `div`, as XHTML 1.1 requires block content
+  there. Calibre's MOBI conversions often produce such contents pages. Blockquotes
+  with any block child stay unchanged; EPUB 3 allows inline content and is not
+  offered this repair. The blockquote keeps its attributes and every inline node.
 - For EPUB 2/3, replace a paragraph wrapper directly inside `body`/`div` with a
   `div` when it contains only headings/lists and whitespace. Mixed prose, inline
   parents and other block types remain for manual review. IDs, classes, links and

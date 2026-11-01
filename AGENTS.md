@@ -63,7 +63,8 @@ Keep reader compatibility claims tied to actual device evidence.
   only the approved attributes and EPUB 3 modification timestamp, with independent
   tree comparison and unchanged reading text/unrelated resource bytes.
   Markup repair fills only empty EPUB 2 root language attributes from one package
-  language and converts block-only paragraph wrappers inside body/div. Preserve
+  language, wraps inline-only EPUB 2 blockquote content in one plain div, and
+  converts block-only paragraph wrappers inside body/div. Preserve
   local language overrides, prose, attributes, IDs and unrelated bytes; compare
   full XML trees independently. EPUB 3 empty languages are valid and stay intact.
 - `inbox.py`: stable-file batch/foreground ingestion. Always use the atomic

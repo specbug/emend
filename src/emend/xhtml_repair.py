@@ -1,4 +1,5 @@
-"""Reviewed repairs for empty root languages and block-only paragraph wrappers."""
+"""Reviewed repairs for empty root languages, block-only paragraph wrappers and
+inline-only blockquotes."""
 
 import re
 import zipfile
@@ -13,8 +14,9 @@ from emend.navigation_repair import same_xml, serialize
 
 ACTION = "xhtml.markup"
 DESCRIPTION = (
-    "In EPUB 2, fill empty root language attributes from the one declared package language. Replace "
-    "paragraph wrappers containing only headings/lists with divs. Preserve all text, IDs, links, "
+    "In EPUB 2, fill empty root language attributes from the one declared package language and "
+    "wrap the content of inline-only blockquotes in a div. Replace paragraph wrappers containing "
+    "only headings/lists with divs. Preserve all text, IDs, links, "
     "attributes and unrelated resource bytes; update the EPUB 3 modification timestamp. "
     "Stylesheets stay unchanged, but element selectors may render a div differently: preview "
     "the affected pages before sending."
@@ -26,6 +28,15 @@ MAX_EDITS = 500
 XML_LANG = "{http://www.w3.org/XML/1998/namespace}lang"
 HTML = f"{{{NS['h']}}}"
 BLOCKS = {HTML + tag for tag in ("h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol")}
+# XHTML 1.1 block-level content; EPUB 2 blockquotes may contain only these.
+XHTML_BLOCKS = {
+    HTML + tag
+    for tag in (
+        *("h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "dl", "p", "div", "pre"),
+        *("address", "blockquote", "hr", "table", "form", "fieldset", "noscript"),
+        *("script", "ins", "del"),
+    )
+}
 # Conservative subset of BCP 47: ordinary language/script/region/variant tags.
 # Unknown or more complex declarations remain for manual review; no language detection.
 LANGUAGE = re.compile(
@@ -38,7 +49,7 @@ class MarkupRepair(BaseModel):
     model_config = ConfigDict(extra="forbid")
     document: str = Field(max_length=1000)
     element: int = Field(ge=0, lt=50000)
-    kind: Literal["language", "block-wrapper"]
+    kind: Literal["language", "block-wrapper", "inline-wrapper"]
     attribute: Literal["lang", "xml:lang"] | None = None
     before: str = Field(max_length=100)
     after: str = Field(max_length=100)
@@ -104,6 +115,27 @@ def discover_markup(source, inspection) -> list[MarkupRepair]:
                             )
                         )
             for index, node in enumerate(nodes):
+                # EPUB 2 (XHTML 1.1) blockquotes take block content only. Wrap content that
+                # is entirely inline in one plain div; mixed content stays for manual review.
+                if (
+                    inspection.epub_version == "2.0"
+                    and node.tag == HTML + "blockquote"
+                    and not any(child.tag in XHTML_BLOCKS for child in node)
+                    and (
+                        (node.text or "").strip()
+                        or any(isinstance(child.tag, str) for child in node)
+                    )
+                ):
+                    edits.append(
+                        MarkupRepair(
+                            document=document,
+                            element=index,
+                            kind="inline-wrapper",
+                            before="blockquote",
+                            after="blockquote>div",
+                        )
+                    )
+                    continue
                 if node.tag != HTML + "p" or node.getparent().tag not in {
                     HTML + "body",
                     HTML + "div",
@@ -144,6 +176,15 @@ def rewrite_markup(source, target, inspection, edits):
                 if node.get(attribute) != edit.before:
                     raise ValueError("Language proposal no longer matches the source.")
                 node.set(attribute, edit.after)
+            elif edit.kind == "inline-wrapper":
+                if node.tag != HTML + "blockquote" or any(
+                    child.tag in XHTML_BLOCKS for child in node
+                ):
+                    raise ValueError("Blockquote proposal no longer matches the source.")
+                wrapper = node.makeelement(HTML + "div", {})
+                wrapper.text, node.text = node.text, None
+                wrapper.extend(list(node))
+                node.append(wrapper)
             else:
                 if node.tag != HTML + "p":
                     raise ValueError("Paragraph proposal no longer matches the source.")
@@ -188,12 +229,31 @@ def markup_preserved(source, candidate, inspection, edits):
                 continue
             a, b = parse_xml(before), parse_xml(after)
             old_nodes, new_nodes = list(a.iter()), list(b.iter())
-            if len(old_nodes) != len(new_nodes):
+            ours = sorted(
+                (edit for edit in edits if edit.document == info.filename),
+                key=lambda edit: edit.element,
+            )
+            # Each wrapper adds one element, directly after its blockquote in document order.
+            if len(new_nodes) != len(old_nodes) + sum(e.kind == "inline-wrapper" for e in ours):
                 return False
-            for edit in edits:
-                if edit.document != info.filename:
+            shift, unwrap = 0, []
+            for edit in ours:
+                left, right = old_nodes[edit.element], new_nodes[edit.element + shift]
+                if edit.kind == "inline-wrapper":
+                    children = list(right)
+                    if (
+                        left.tag != HTML + "blockquote"
+                        or right.tag != HTML + "blockquote"
+                        or (right.text or "").strip()
+                        or len(children) != 1
+                        or children[0].tag != HTML + "div"
+                        or children[0].attrib
+                        or (children[0].tail or "").strip()
+                    ):
+                        return False
+                    unwrap.append((right, children[0]))
+                    shift += 1
                     continue
-                left, right = old_nodes[edit.element], new_nodes[edit.element]
                 if edit.kind == "language":
                     attribute = XML_LANG if edit.attribute == "xml:lang" else "lang"
                     if left.get(attribute) != edit.before or right.get(attribute) != edit.after:
@@ -203,6 +263,10 @@ def markup_preserved(source, candidate, inspection, edits):
                     if left.tag != HTML + "p" or right.tag != HTML + "div":
                         return False
                     right.tag = left.tag
+            for quote, wrapper in unwrap:
+                quote.text = wrapper.text
+                quote.remove(wrapper)
+                quote.extend(list(wrapper))
             if info.filename == inspection.package_path:
                 old_modified = a.xpath(
                     "opf:metadata/opf:meta[@property='dcterms:modified']", namespaces=NS

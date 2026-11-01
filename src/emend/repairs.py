@@ -269,6 +269,8 @@ def prepare_repairs(book_id: str, config: Config) -> tuple[RepairPlan, Path]:
                     + (
                         f"set empty <code>{esc(edit.attribute)}</code> to <code>{esc(edit.after)}</code>"
                         if edit.kind == "language"
+                        else "wrap inline-only <code>blockquote</code> content in a <code>div</code>"
+                        if edit.kind == "inline-wrapper"
                         else "replace block-only <code>p</code> wrapper with <code>div</code>"
                     )
                     + ".</li>"

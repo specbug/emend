@@ -52,7 +52,8 @@ TAG_WORDS = {
 }
 SUPPORTED_REPAIRS = (
     "ZIP packaging, contents links whose letter case does not match the file, "
-    "empty root language attributes and paragraph wrappers that only hold blocks"
+    "empty root language attributes, blockquotes that hold only inline content "
+    "and paragraph wrappers that only hold blocks"
 )
 
 

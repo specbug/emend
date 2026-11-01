@@ -1,5 +1,17 @@
 # Validation evidence
 
+## Inline-only EPUB 2 blockquotes — 0.25
+
+A private EPUB 2 book converted from MOBI by Calibre (not committed or named) failed
+official EPUBCheck 5.3.0 with RSC-005: its contents page put 38 links directly in
+`blockquote` elements. The new markup repair wrapped each blockquote's inline
+content in one plain `div`; the independent check unwrapped them and compared full
+XML trees. EPUBCheck then reported 0 errors and 0 warnings, the reading-text
+fingerprint was unchanged, and paginated 600 × 800 renders of the repaired contents
+page matched the original layout. Original fixtures cover wrapping in EPUB 2,
+no offer in EPUB 3, unchanged block/mixed/empty blockquotes, independent refusal of
+changed wrappers or text, and official EPUBCheck acceptance.
+
 ## Image conversion on a large private book — 0.24.1
 
 The large private reference book (not committed or named) was converted in a

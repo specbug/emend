@@ -317,3 +317,93 @@ def test_browser_rerun_replaces_old_empty_plan_with_markup_fix_then_download(
         assert sha256_file(target) == after.artifact_sha256 != sha256_file(source)
         assert after.repair_changes[-1].action == ACTION
         browser.close()
+
+
+def quote_files(version="2.0", quote=None):
+    files = book_files(version)
+    files["EPUB/notes.xhtml"] = files["EPUB/notes.xhtml"].replace(
+        b"</body>",
+        quote
+        or (
+            b'<blockquote class="toc" id="q1">See <a href="chapter.xhtml#start">'
+            b'<span class="u">At the Observatory</span></a> again.</blockquote>'
+            b'<blockquote><a href="chapter.xhtml#ref1">Return</a></blockquote></body>'
+        ),
+    )
+    return files
+
+
+@pytest.mark.parametrize("version", ["2.0", "3.0"])
+def test_inline_only_blockquotes_are_wrapped_in_epub2_only(tmp_path, config, version):
+    _, before, plan, review = setup(tmp_path, config, version, quote_files(version))
+    wrappers = [edit for edit in plan.markup if edit.kind == "inline-wrapper"]
+    if version == "3.0":
+        assert not wrappers  # HTML5 blockquotes take phrasing content.
+        return
+    assert len(wrappers) == 2 and "blockquote" in review.read_text()
+    after = apply(plan, config)
+    assert after.state == "VALIDATED"
+    assert after.inspection.text_sha256 == before.inspection.text_sha256
+    artifact = config.root / "curated" / f"{before.book_id}.epub"
+    with zipfile.ZipFile(artifact) as archive:
+        tree = parse_xml(archive.read("EPUB/notes.xhtml"))
+    first, second = tree.xpath("//h:blockquote", namespaces=NS)
+    assert first.get("class") == "toc" and first.get("id") == "q1" and not first.text
+    (wrapper,) = list(first)
+    assert wrapper.tag == f"{{{NS['h']}}}div" and not wrapper.attrib
+    assert wrapper.text == "See " and wrapper[0].get("href") == "chapter.xhtml#start"
+    assert wrapper[0].tail == " again."
+    assert [c.tag for c in second] == [f"{{{NS['h']}}}div"]
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        b"<blockquote><p>Already block content.</p></blockquote></body>",
+        b"<blockquote>Mixed <p>block</p></blockquote></body>",
+        b"<blockquote>  </blockquote></body>",
+    ],
+)
+def test_block_mixed_or_empty_blockquotes_are_not_wrapped(tmp_path, config, quote):
+    _, _, plan, _ = setup(tmp_path, config, "2.0", quote_files("2.0", quote))
+    assert not [edit for edit in plan.markup if edit.kind == "inline-wrapper"]
+
+
+@pytest.mark.parametrize("mutation", ["wrapper_attribute", "prose", "outside", "unwrapped"])
+def test_independent_check_refuses_changed_blockquote_wrappers(tmp_path, config, mutation):
+    from emend.xhtml_repair import rewrite_markup
+
+    source, before, plan, _ = setup(tmp_path, config, "2.0", quote_files())
+    candidate = tmp_path / "candidate.epub"
+    rewrite_markup(source, candidate, before.inspection, plan.markup)
+    assert markup_preserved(source, candidate, before.inspection, plan.markup)
+    with zipfile.ZipFile(candidate) as archive:
+        infos = archive.infolist()
+        data = {i.filename: archive.read(i) for i in infos}
+    notes = data["EPUB/notes.xhtml"]
+    data["EPUB/notes.xhtml"] = {
+        "wrapper_attribute": notes.replace(b"<div>", b'<div class="x">', 1),
+        "prose": notes.replace(b" again.", b" later."),
+        "outside": notes.replace(b"</div></blockquote>", b"</div>Extra</blockquote>", 1),
+        "unwrapped": notes.replace(b"<div>", b"", 1).replace(
+            b"</div></blockquote>", b"</blockquote>", 1
+        ),
+    }[mutation]
+    assert data["EPUB/notes.xhtml"] != notes
+    tampered = tmp_path / "tampered.epub"
+    with zipfile.ZipFile(tampered, "w") as archive:
+        for info in infos:
+            archive.writestr(copy.copy(info), data[info.filename])
+    assert not markup_preserved(source, tampered, before.inspection, plan.markup)
+
+
+def test_official_epubcheck_accepts_wrapped_blockquotes(tmp_path, config):
+    jar = os.environ.get("EMEND_TEST_EPUBCHECK_JAR")
+    if not jar:
+        pytest.skip("Set EMEND_TEST_EPUBCHECK_JAR for official validation")
+    config.tools.epubcheck_jar = Path(jar)
+    _, before, plan, _ = setup(tmp_path, config, "2.0", quote_files())
+    assert before.state == "FAILED"
+    after = apply(plan, config)
+    assert after.state == "VALIDATED"
+    assert next(g for g in after.gates if g.name == "epubcheck").status == "passed"

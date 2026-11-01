@@ -13,7 +13,8 @@ Emend tries its supported repairs by itself after import and on **Run everything
 again**; the book's **Repair** step lists what it applied, with a link to the exact
 change. If **Fix HTML markup** was applied, you do not need to edit or reimport a copy
 manually. Emend repairs empty EPUB 2 root language attributes from one
-unambiguous package language and block-only paragraph wrappers inside `body` or
+unambiguous package language, inline-only EPUB 2 blockquotes (content wrapped in
+one `div`) and block-only paragraph wrappers inside `body` or
 `div`. Nonempty language values, mixed prose and uncertain nesting remain manual.
 
 ## Invalid language attributes
